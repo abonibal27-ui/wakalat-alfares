@@ -315,7 +315,13 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
     <div id="tab-pos" class="tab-content">
         <div class="card hide-on-print">
             <div class="card-title" id="pos-title">إنشاء فاتورة جديدة</div>
-            <div class="form-group"><label>العميل</label><select id="inv-client-select" onchange="updateInvoiceClientName()"><option value="عام">عميل عام / نقدي</option></select></div> 
+            <div class="form-group"><label>العميل</label><select id="inv-client-select" onchange="updateInvoiceClientName()"><option value="عام">عميل عام / نقدي</option></select></div> <div class="form-group">
+    <label>نوع السعر</label>
+    <select id="invoice-price-type">
+        <option value="retail">مفرق</option>
+        <option value="wholesale">جملة</option>
+    </select>
+</div>
             <div class="form-group" style="position: relative;">
                 <label>البحث لإضافة قطعة</label>
                 <input type="text" id="inv-search-input" placeholder="اكتب اسم القطعة..." oninput="debouncedFilterInvoice()" autocomplete="off">
@@ -1228,7 +1234,23 @@ function addProductToInvoice() {
     const prodId = document.getElementById('inv-product-select').value; 
     const prod = products.find(p => p && p.id == prodId); 
     if(prod) { 
-        currentInvoiceItems.push({ prodId: prod.id, name: prod.name, image: prod.image || "", qty: 1, price: prod.retail, cost: prod.cost, maxStock: prod.stock });
+        const priceType =
+document.getElementById('invoice-price-type').value;
+
+const selectedPrice =
+priceType === 'wholesale'
+? (prod.wholesale || 0)
+: (prod.retail || 0);
+
+currentInvoiceItems.push({
+    prodId: prod.id,
+    name: prod.name,
+    image: prod.image || "",
+    qty: 1,
+    price: selectedPrice,
+    cost: prod.cost,
+    maxStock: prod.stock
+});
         document.getElementById('inv-search-input').value = ''; document.getElementById('inv-product-select').style.display = 'none'; renderInvoiceTable(); 
     } 
 }
@@ -1318,7 +1340,11 @@ parseFloat(document.getElementById('inv-discount')?.value) || 0;
     else if (curr === 'try' && rates.try > 0) { paidUsd = inputValue / rates.try; } 
     else if (curr === 'syp' && rates.syp > 0) { paidUsd = inputValue / rates.syp; }
     
-    const remaining = total - paidUsd; 
+    let remaining = total - paidUsd;
+
+if (Math.abs(remaining) <= 0.50) {
+    remaining = 0;
+}
     if (clientName === 'عام' && remaining > 0) return alert("لا يمكن تسجيل ذمة على عميل عام!"); 
     
     const backupProducts = JSON.stringify(products); const backupClients = JSON.stringify(clients); const backupSafes = JSON.stringify(safes);
