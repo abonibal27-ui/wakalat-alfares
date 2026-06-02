@@ -203,7 +203,7 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
         </div>
     </div>
 <div class="card hide-on-print">
-    <div class="card-title">📈 إحصائيات الأرباح</div>v>
+    <div class="card-title">📈 إحصائيات الأرباح</div>
 
     <p style="margin-bottom:10px;">
         💰 ربح اليوم:
@@ -277,6 +277,29 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
                 <label>اختر العميل (للدين)</label>
                 <select id="ret-client-select"><option value="">-- اختر العميل --</option></select>
             </div>
+            <div class="form-group">
+    <label>الدفعة المستلمة</label>
+    <div style="display:flex; gap:5px;">
+        <input
+            type="number"
+            id="ret-paid-amount"
+            value="0"
+            step="0.01"
+            oninput="calculateRetailTotal()">
+
+        <select
+    id="ret-paid-currency"
+    style="width:100px;"
+    onchange="calculateRetailTotal()">
+            <option value="usd">$ دولار</option>
+            <option value="try">₺ تركي</option>
+            <option value="syp">ل.س سوري</option>
+        </select>
+        <span id="ret-paid-eq"
+      style="display:block;font-size:12px;color:#64748b;margin-top:5px;">
+</span>
+    </div>
+</div>
             <div class="form-group" style="background: var(--bg-color); padding: 12px; border-radius: 10px; font-weight: bold; border: 1px solid #cbd5e1;">
                 الإجمالي: <span id="ret-total-preview" style="color:var(--success-color); font-size: 18px;">0.00</span> $
                 <span id="ret-eq-text" style="display: block; font-size: 12px; color: #64748b; margin-top: 5px;"></span>
@@ -292,13 +315,7 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
     <div id="tab-pos" class="tab-content">
         <div class="card hide-on-print">
             <div class="card-title" id="pos-title">إنشاء فاتورة جديدة</div>
-            <div class="form-group"><label>العميل</label><select id="inv-client-select" onchange="updateInvoiceClientName()"><option value="عام">عميل عام / نقدي</option></select></div> <div class="form-group">
-    <label>نوع السعر</label>
-    <select id="inv-price-type">
-        <option value="wholesale" selected>جملة</option>
-        <option value="retail">مفرق</option>
-    </select>
-</div>
+            <div class="form-group"><label>العميل</label><select id="inv-client-select" onchange="updateInvoiceClientName()"><option value="عام">عميل عام / نقدي</option></select></div> 
             <div class="form-group" style="position: relative;">
                 <label>البحث لإضافة قطعة</label>
                 <input type="text" id="inv-search-input" placeholder="اكتب اسم القطعة..." oninput="debouncedFilterInvoice()" autocomplete="off">
@@ -1026,6 +1043,24 @@ function calculateRetailTotal() {
     if(curr === 'try' && rates.try > 0) { eqText = `≈ ${(totalUsd * rates.try).toFixed(2)} ₺`; }
     else if(curr === 'syp' && rates.syp > 0) { eqText = `≈ ${(totalUsd * rates.syp).toFixed(0)} ل.س`; }
     document.getElementById('ret-eq-text').innerText = eqText;
+    let paidValue =
+parseFloat(document.getElementById('ret-paid-amount')?.value) || 0;
+
+let paidCurrency =
+document.getElementById('ret-paid-currency')?.value || 'usd';
+
+let paidUsd = paidValue;
+
+if (paidCurrency === 'try' && rates.try > 0) {
+    paidUsd = paidValue / rates.try;
+}
+else if (paidCurrency === 'syp' && rates.syp > 0) {
+    paidUsd = paidValue / rates.syp;
+}
+
+document.getElementById('ret-paid-eq').innerText =
+`يعادل ${paidUsd.toFixed(2)} $`;
+
 } 
 
 function toggleRetailClientSelect() { 
@@ -1041,7 +1076,19 @@ function submitRetailSale() {
     const payType = document.getElementById('ret-payment-type').value; 
     const curr = document.getElementById('ret-currency').value;
     const clientName = document.getElementById('ret-client-select').value; 
-    
+  const paidAmount =
+parseFloat(document.getElementById('ret-paid-amount')?.value) || 0;
+
+const paidCurrency =
+document.getElementById('ret-paid-currency')?.value || 'usd';  
+let paidUsd = paidAmount;
+
+if (paidCurrency === 'try' && rates.try > 0) {
+    paidUsd = paidAmount / rates.try;
+}
+else if (paidCurrency === 'syp' && rates.syp > 0) {
+    paidUsd = paidAmount / rates.syp;
+}
     if(!prodId) return alert("الرجاء اختيار قطعة!"); 
     const prod = products.find(p => p && p.id == prodId); if(!prod) return; 
     if(prod.stock < qty) return alert(`عذراً! المتوفر هو ${prod.stock} قطع.`); 
@@ -1052,35 +1099,57 @@ function submitRetailSale() {
     prod.stock -= qty; const totalSaleUsd = manualPrice * qty; const profitEarned = totalSaleUsd - ((prod.cost || 0) * qty); 
     let currencyRecorded = 'usd', amountRecorded = totalSaleUsd;
 
-    if (payType === 'debt') { 
-        const client = clients.find(c => c && c.name === clientName); 
-        
-        if (client) {
+    if (payType === 'debt') {
 
-    client.balance =
-        (client.balance || 0) + totalSaleUsd;
+    const client = clients.find(
+        c => c && c.name === clientName
+    );
 
-    if(!client.transactions)
-        client.transactions = [];
+    if (client) {
 
-    client.transactions.unshift({
-        type: 'retail',
-        amount: totalSaleUsd,
-        date: Date.now(),
-        note: 'بيع مفرق دين'
-    });
+        const remainingDebt =
+            Math.max(0, totalSaleUsd - paidUsd);
+const balanceBefore = client.balance || 0;
+        client.balance =
+            (client.balance || 0) + remainingDebt;
 
-}
-    } else {
-        currencyRecorded = curr;
-        if(curr === 'try') amountRecorded = totalSaleUsd * rates.try;
-        else if(curr === 'syp') amountRecorded = totalSaleUsd * rates.syp;
-        safes[curr] = (safes[curr] || 0) + amountRecorded;
+        if (!client.transactions)
+            client.transactions = [];
+
+        client.transactions.unshift({
+            type: 'retail',
+            amount: remainingDebt,
+            date: Date.now(),
+            note: 'بيع مفرق دين',
+            balanceBefore: balanceBefore,
+balanceAfter: client.balance
+        });
+
+        currencyRecorded = paidCurrency;
+        amountRecorded = paidAmount;
+
+        if (paidAmount > 0) {
+            safes[paidCurrency] =
+                (safes[paidCurrency] || 0) + paidAmount;
+        }
     }
-    
+
+} else {
+
+    currencyRecorded = paidCurrency;
+    amountRecorded = paidAmount;
+
+    if (paidAmount > 0) {
+        safes[paidCurrency] =
+            (safes[paidCurrency] || 0) + paidAmount;
+    }
+}
     retailSales.unshift({ id: generateUniqueID(),
     timestamp: Date.now(),
-    prodId: prod.id, name: prod.name, qty: qty, total: totalSaleUsd, profit: profitEarned, payType: payType, currency: currencyRecorded || 'usd', actualPaid: Number(amountRecorded || 0), clientName: payType === 'debt' ? clientName : '', date: new Date().toLocaleTimeString('ar-EG') }); 
+    prodId: prod.id, name: prod.name, qty: qty, total: totalSaleUsd,debtAmount:
+    payType === 'debt'
+        ? Math.max(0, totalSaleUsd - paidUsd)
+        : 0, profit: profitEarned, payType: payType, currency: currencyRecorded || 'usd', actualPaid: Number(amountRecorded || 0), clientName: payType === 'debt' ? clientName : '', date: new Date().toLocaleTimeString('ar-EG') }); 
     addTrackRecord(prod.id, prod.name, 'بيع مفرق', -qty, `مبيع مفرق بسعر ${manualPrice}$`); 
     saveLocalData(); updateRetailSalesUI(); calculateDashboard(); 
     
@@ -1096,15 +1165,36 @@ function deleteRetailSale(id) {
     const sale = retailSales[idx]; const prod = products.find(p => p && p.id === sale.prodId); 
     
     if (prod) { prod.stock += sale.qty; addTrackRecord(prod.id, prod.name, 'استرجاع', sale.qty, 'إلغاء بيع مفرق'); } 
-    if (sale.payType === 'debt' && sale.clientName) { 
-        const client = clients.find(c => c && c.name === sale.clientName); 
-        if (client) client.balance = Math.max(0, (client.balance || 0) - sale.total); 
-    } else {
-        let curr = sale.currency || 'usd'; let paid = Number(sale.actualPaid || 0);
-        safes[curr] = Math.max(0, (safes[curr] || 0) - paid); // إصلاح المشكلة 2
-    }
+    if (sale.payType === 'debt' && sale.clientName) {
+
+    const client = clients.find(
+        c => c && c.name === sale.clientName
+    );
+
+    if (client) {
+
+    client.balance =
+        Math.max(
+            0,
+            (client.balance || 0) -
+            Number(sale.debtAmount || 0)
+        );
+
+}
+}
+
+let curr = sale.currency || 'usd';
+let paid = Number(sale.actualPaid || 0);
+
+if (paid > 0) {
+    safes[curr] =
+        Math.max(0, (safes[curr] || 0) - paid);
+}
     
-    retailSales.splice(idx, 1); saveLocalData(); updateRetailSalesUI(); calculateDashboard(); 
+    retailSales.splice(idx, 1); saveLocalData();
+if (typeof updateClientsUI === 'function') {
+    updateClientsUI();
+} updateRetailSalesUI(); calculateDashboard(); 
     addAdminLog("إلغاء بيع مفرق", `تم إلغاء مبيع: ${sale.name} بقيمة ${sale.total}$`);
 }
 
@@ -1134,28 +1224,21 @@ function filterInvoiceProducts() {
 }
 const debouncedFilterInvoice = debounce(filterInvoiceProducts, 250);
 
-function addProductToInvoice() {
-    const prodId = document.getElementById('inv-product-select').value;
-    const prod = products.find(p => p && p.id == prodId);
-
-    if (prod) {
-
-        const priceType = document.getElementById('inv-price-type').value;
-
-        currentInvoiceItems.push({
-            prodId: prod.id,
-            name: prod.name,
-            image: prod.image || "",
-            qty: 1,
-            price: priceType === 'wholesale' ? prod.wholesale : prod.retail,
-            cost: prod.cost,
-            maxStock: prod.stock
-        });
-
-        document.getElementById('inv-search-input').value = '';
-        document.getElementById('inv-product-select').style.display = 'none';
-        renderInvoiceTable();
-    }
+function addProductToInvoice() { 
+    const prodId = document.getElementById('inv-product-select').value; 
+    const prod = products.find(p => p && p.id == prodId); 
+    if(prod) { 
+        currentInvoiceItems.push({ prodId: prod.id, name: prod.name, image: prod.image || "", qty: 1, price: prod.retail, cost: prod.cost, maxStock: prod.stock });
+        document.getElementById('inv-search-input').value = ''; document.getElementById('inv-product-select').style.display = 'none'; renderInvoiceTable(); 
+    } 
+}
+function updateInvItem(index, field, value) { 
+    let val = parseFloat(value); 
+    if(field === 'qty') { 
+        if(val > currentInvoiceItems[index].maxStock) { alert("الكمية المطلوبة أكبر من المتوفر!"); val = currentInvoiceItems[index].maxStock; } 
+        if(val < 1) val = 1; 
+    } 
+    currentInvoiceItems[index][field] = val; renderInvoiceTable(); 
 }
 function removeInvoiceItem(index) { currentInvoiceItems.splice(index, 1); renderInvoiceTable(); }
 function renderInvoiceTable() { 
@@ -1272,7 +1355,9 @@ parseFloat(document.getElementById('inv-discount')?.value) || 0;
 
     if(c){
 
-        c.balance = (c.balance || 0) + remaining;
+        const balanceBefore = c.balance || 0;
+
+        c.balance = balanceBefore + remaining;
 
         if(!c.transactions)
             c.transactions = [];
@@ -1281,7 +1366,9 @@ parseFloat(document.getElementById('inv-discount')?.value) || 0;
             type: 'invoice',
             amount: remaining,
             date: Date.now(),
-            note: 'فاتورة رقم ' + currentInvNumber
+            note: 'فاتورة رقم ' + currentInvNumber,
+            balanceBefore: balanceBefore,
+            balanceAfter: c.balance
         });
     }
 }
@@ -1752,32 +1839,58 @@ function showClientStatement(idx) {
     const client = clients[idx];
     if (!client) return;
 
-    let html = `
-العميل: ${client.name}
+let html = `
 
-الهاتف: ${client.phone || '-'}
+👤 العميل: ${client.name}<br>
+📞 الهاتف: ${client.phone || '-'}<br>
+💰 الرصيد الحالي: ${(client.balance || 0).toFixed(2)} $<br>
 
-الرصيد الحالي: ${(client.balance || 0).toFixed(2)} $
-
--------------------------
-
+════════════════════
 `;
 
     if (client.transactions && client.transactions.length) {
 
         client.transactions.forEach(t => {
 
+const color =
+t.type === "payment"
+? "#16a34a"
+: "#dc2626";
+
+const bgColor =
+t.type === "payment"
+? "#f0fdf4"
+: "#fef2f2";
+
             html += `
+<div style="
+background:${bgColor};
+border-right:5px solid ${color};
+padding:12px;
+margin-bottom:12px;
+border-radius:10px;
+">
+📅 التاريخ:
 ${new Date(t.date).toLocaleString('ar-EG')}
+<br>
 
+📝 العملية:
 ${t.note}
+<br>
 
-المبلغ: ${Number(t.amount || 0).toFixed(2)} $
+💵 المبلغ:
+${t.type === "payment" ? "-" : "+"}
+${Number(t.amount || 0).toFixed(2)} $
+<br>
 
--------------------------
+💰 الرصيد السابق:
+${Number(t.balanceBefore || 0).toFixed(2)} $
+<br>
 
+💰 الرصيد بعد الحركة:
+<b>${Number(t.balanceAfter || 0).toFixed(2)} $</b>
+</div>
 `;
-
         });
 
     } else {
@@ -1786,7 +1899,15 @@ ${t.note}
 
     }
 
-    alert(html);
+    document.getElementById('client-statement-content').innerHTML =
+`
+<div style="line-height:1.6">
+${html}
+</div>
+`;
+
+document.getElementById('client-statement-modal').style.display =
+'flex';
 
 }
 function updateSuppliersUI() { 
@@ -1874,7 +1995,7 @@ function payClientDebt(idx) {
         amount,
         client.balance || 0
     );
-
+const balanceBefore = client.balance || 0;
     client.balance =
         (client.balance || 0) - amount;
 
@@ -1885,11 +2006,13 @@ function payClientDebt(idx) {
         client.transactions = [];
 
     client.transactions.unshift({
-        type: "payment",
-        amount: amount,
-        date: Date.now(),
-        note: "تسديد دين"
-    });
+    type: "payment",
+    amount: amount,
+    date: Date.now(),
+    note: "تسديد دين",
+    balanceBefore: balanceBefore,
+    balanceAfter: client.balance
+});
 
     saveLocalData();
     updateClientsUI();
@@ -1901,9 +2024,52 @@ function payClientDebt(idx) {
         " $ بنجاح"
     );
 }
-
+function closeClientStatement() {
+    document.getElementById('client-statement-modal').style.display = 'none';
+}
 // PWA Service Worker
 if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(error => console.log('SW Registration Failed', error)); }); }
 </script>
+<div id="client-statement-modal"
+style="
+display:none;
+position:fixed;
+top:0;
+left:0;
+right:0;
+bottom:0;
+background:rgba(0,0,0,.6);
+z-index:99999;
+justify-content:center;
+align-items:center;
+padding:15px;">
+
+<div style="
+background:white;
+width:100%;
+max-width:800px;
+max-height:90vh;
+overflow:auto;
+border-radius:15px;
+padding:20px;">
+
+<h2>📋 كشف حساب العميل</h2>
+
+<div id="client-statement-content"></div>
+
+<button
+onclick="closeClientStatement()"
+style="
+margin-top:15px;
+background:#ef4444;
+color:white;
+padding:10px 20px;
+border:none;
+border-radius:8px;">
+إغلاق
+</button>
+
+</div>
+</div>
 </body>
 </html>
