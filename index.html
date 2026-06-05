@@ -681,13 +681,40 @@ let isSyncing = false; let lastSyncTime = null;
 
 localforage.config({ name: 'AlFaresAgency', storeName: 'pos_database' });
 
-async function saveLocalData() {
+async function saveLocalData(syncCloud = true) {
+
     try {
-        await localforage.setItem('alfares_data', { 
-            products, categories, clients, suppliers, expenses, invoices, retailSales, 
-            itemTracks, rates, safes, exchanges, partnerWithdrawals, invoiceCount, adminLogs 
+
+        await localforage.setItem('alfares_data', {
+            products,
+            categories,
+            clients,
+            suppliers,
+            expenses,
+            invoices,
+            retailSales,
+            itemTracks,
+            rates,
+            safes,
+            exchanges,
+            partnerWithdrawals,
+            invoiceCount,
+            adminLogs
         });
-    } catch (error) { console.error("فشل الحفظ المحلي:", error); }
+
+        if (
+            syncCloud &&
+            navigator.onLine &&
+            !isSyncing
+        ) {
+            pushToCloud();
+        }
+
+    } catch (error) {
+
+        console.error("فشل الحفظ المحلي:", error);
+
+    }
 }
 
 async function loadLocalData() {
@@ -745,7 +772,7 @@ async function pullFromCloud() {
             if(data.invoiceCount) invoiceCount = data.invoiceCount;
             lastSyncTime = data.lastSyncTime || 0;
             
-            await saveLocalData(); 
+           await saveLocalData(false);
             updateAllUI();
             alert("✅ تم استرجاع بضاعتك وبياناتك من السحابة بنجاح!");
         } else { alert("⚠️ السحابة فارغة أو لا يوجد اتصال بالإنترنت."); }
@@ -790,7 +817,40 @@ async function manualSync() {
         isSyncing = false; btn.innerText = "🔼 رفع للسحابة"; btn.disabled = false;
     }
 }
+async function pushToCloud() {
 
+    if (!navigator.onLine) return;
+
+    try {
+
+        const updates = {
+            categories,
+            products,
+            expenses,
+            clients,
+            suppliers,
+            retailSales,
+            invoices,
+            itemTracks,
+            invoiceCount,
+            rates,
+            safes,
+            exchanges,
+            partnerWithdrawals,
+            adminLogs,
+            lastSyncTime: Date.now()
+        };
+
+        await db.ref().update(updates);
+
+        lastSyncTime = updates.lastSyncTime;
+
+    } catch (err) {
+
+        console.error("Auto Sync Error:", err);
+
+    }
+}
 function addAdminLog(action, details) {
     adminLogs.unshift({ id: generateUniqueID(), action: action, details: details, date: new Date().toLocaleString('ar-EG') });
     if (adminLogs.length > 200) adminLogs.length = 200;
@@ -812,9 +872,70 @@ function renderAdminLogs() {
 
 function clearLogs() { if(confirm("هل أنت متأكد من مسح سجل النظام بالكامل؟")) { adminLogs = []; saveLocalData(); renderAdminLogs(); } }
 
-function initApp() {
-    loadLocalData(); checkConnection();
-    window.addEventListener('online', checkConnection); window.addEventListener('offline', checkConnection);
+async function initApp() {
+
+    await loadLocalData();
+
+    checkConnection();
+
+    window.addEventListener('online', checkConnection);
+    window.addEventListener('offline', checkConnection);
+   startRealtimeSync(); 
+}
+function startRealtimeSync() {
+
+    db.ref('lastSyncTime').on('value', async (snapshot) => {
+
+        const cloudTime = snapshot.val();
+
+        if (!cloudTime) return;
+
+        if (
+            lastSyncTime &&
+            cloudTime <= lastSyncTime
+        ) return;
+
+        try {
+
+            const dataSnapshot = await db.ref().once('value');
+            const data = dataSnapshot.val();
+
+            if (!data) return;
+
+            products = forceArray(data.products);
+            categories = forceArray(data.categories);
+            clients = forceArray(data.clients);
+            suppliers = forceArray(data.suppliers);
+            expenses = forceArray(data.expenses);
+            invoices = forceArray(data.invoices);
+            retailSales = forceArray(data.retailSales);
+            itemTracks = forceArray(data.itemTracks);
+
+            if (data.rates) rates = data.rates;
+            if (data.safes) safes = data.safes;
+
+            exchanges = forceArray(data.exchanges);
+            partnerWithdrawals = forceArray(data.partnerWithdrawals);
+
+            invoiceCount = data.invoiceCount || 0;
+            adminLogs = forceArray(data.adminLogs);
+
+            lastSyncTime = data.lastSyncTime || cloudTime;
+
+            await saveLocalData(false);
+
+            updateAllUI();
+
+            console.log("Realtime sync updated");
+
+        } catch (err) {
+
+            console.error("Realtime Sync Error:", err);
+
+        }
+
+    });
+
 }
 
 function checkConnection() {
