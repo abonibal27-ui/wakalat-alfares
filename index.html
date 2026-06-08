@@ -533,6 +533,16 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
     </div>
 
     <div id="tab-partners" class="tab-content">
+<div class="card">
+<div class="card-title">💰 إضافة رأس مال</div>
+<div class="form-group"><label>اسم الشريك</label>
+<select id="capital-name"><option value="أبو نيبال">أبو نيبال</option><option value="أبو عبدو">أبو عبدو</option></select></div>
+<div class="form-group"><label>ملاحظة</label><input type="text" id="capital-note"></div>
+<div class="form-group"><label>المبلغ</label><div style="display:flex; gap:5px;"><input type="number" id="capital-amount" step="any" min="0"><select id="capital-currency" style="width:100px;"><option value="usd">$</option><option value="try">₺</option><option value="syp">ل.س</option></select></div></div>
+<button onclick="saveCapitalRecord()">💰 إضافة رأس المال</button>
+</div>
+<div class="card"><div class="card-title">سجل رأس المال</div><div id="capital-list"></div></div>
+
         <div class="card">
             <div class="card-title">💼 تسجيل سحب شريك</div>
             <p style="margin-bottom: 12px; color:#64748b; font-size:13px; font-weight:600;">تُخصم من الصندوق ولا تُحسب ضمن مصاريف المحل لتجنب التأثير على صافي الأرباح.</p>
@@ -635,6 +645,20 @@ function generateUniqueID() {
 window.addEventListener('error', (e) => { console.error('Global Error:', e.error); });
 window.addEventListener('unhandledrejection', (e) => { console.error('Promise Error:', e.reason); });
 
+
+function mergeById(localArr, cloudArr){
+    const local = Array.isArray(localArr)?localArr:[];
+    const cloud = Array.isArray(cloudArr)?cloudArr:[];
+    const allHaveIds = [...local,...cloud].every(x => !x || x.id);
+    if(!allHaveIds){
+        return cloud.length ? cloud : local;
+    }
+    const map = new Map();
+    local.forEach(x=>{ if(x&&x.id) map.set(x.id,x); });
+    cloud.forEach(x=>{ if(x&&x.id) map.set(x.id,{...(map.get(x.id)||{}),...x}); });
+    return Array.from(map.values());
+}
+
 function forceArray(data) {
     if (!data) return [];
     if (Array.isArray(data)) return data.filter(item => item !== null && item !== undefined);
@@ -688,7 +712,7 @@ const storage = firebase.storage();
 
 let categories = ["إطارات", "محركات", "اكسسوارات"];
 let products = [], expenses = [], clients = [], suppliers = []; 
-let retailSales = [], invoices = [], itemTracks = [], partnerWithdrawals = [], exchanges = [];
+let retailSales = [], invoices = [], itemTracks = [], partnerWithdrawals = [], exchanges = []; let capitalRecords = [];
 let adminLogs = [];
 let safeTransactions = [];
 let invoiceCount = 150; 
@@ -711,11 +735,11 @@ async function saveLocalData(syncCloud = true) {
         await localforage.setItem('expenses', expenses);
         await localforage.setItem('itemTracks', itemTracks);
         await localforage.setItem('otherData', {
-            categories, suppliers, rates, safes, exchanges, partnerWithdrawals, invoiceCount, adminLogs
+            categories, suppliers, rates, safes, exchanges, partnerWithdrawals, capitalRecords, invoiceCount, adminLogs
         });
 
         if (syncCloud && navigator.onLine && !isSyncing && !isApplyingCloudUpdate) {
-            pushToCloud();
+            await pushToCloud();
         }
     } catch (error) {
         console.error(error);
@@ -741,12 +765,13 @@ async function loadLocalData() {
             safes = other.safes || { usd: 0, try: 0, syp: 0 };
             exchanges = other.exchanges || [];
             partnerWithdrawals = other.partnerWithdrawals || [];
+            capitalRecords = other.capitalRecords || [];
             invoiceCount = other.invoiceCount || 150;
             adminLogs = other.adminLogs || [];
         }
         
         if (products.length > 0) {
-            updateAllUI();
+            updateAllUI(); renderCapital && renderCapital();
         } else {
             pullFromCloud();
         }
@@ -766,17 +791,18 @@ async function loadLocalData() {
             }
             if (data) {
                 if(data.products) products = cleanProductsData(data.products);
-                if(data.categories) if (data.categories) categories = forceArray(data.categories);
-                if(data.clients) if (data.clients) clients = forceArray(data.clients);
-                if(data.suppliers) if (data.suppliers) suppliers = forceArray(data.suppliers);
-                if(data.expenses) if (data.expenses) expenses = forceArray(data.expenses);
-                if(data.invoices) if (data.invoices) invoices = forceArray(data.invoices);
-                if(data.retailSales) if (data.retailSales) retailSales = forceArray(data.retailSales);
-                if(data.itemTracks) if (data.itemTracks) itemTracks = forceArray(data.itemTracks);
+                if(data.categories) categories = forceArray(data.categories);
+                if(data.clients) clients = mergeById(clients, forceArray(data.clients));
+                if(data.suppliers) suppliers = mergeById(suppliers, forceArray(data.suppliers));
+                if(data.expenses) expenses = forceArray(data.expenses);
+                if(data.invoices) invoices = forceArray(data.invoices);
+                if(data.retailSales) retailSales = forceArray(data.retailSales);
+                if(data.itemTracks) itemTracks = forceArray(data.itemTracks);
                 if(data.rates) rates = data.rates;
                 if(data.safes) safes = data.safes;
-                if(data.exchanges) if (data.exchanges) exchanges = forceArray(data.exchanges);
-                if(data.partnerWithdrawals) if (data.partnerWithdrawals) partnerWithdrawals = forceArray(data.partnerWithdrawals);
+                if(data.exchanges) exchanges = forceArray(data.exchanges);
+                if(data.partnerWithdrawals) partnerWithdrawals = mergeById(partnerWithdrawals, forceArray(data.partnerWithdrawals));
+        capitalRecords = mergeById(capitalRecords, forceArray(data.capitalRecords));
                 if(data.invoiceCount) invoiceCount = data.invoiceCount;
                 lastSyncTime = data.lastSyncTime || 0;
                 
@@ -817,7 +843,6 @@ async function loadLocalData() {
             const updates = {
                 categories, products, expenses, clients, suppliers, retailSales, 
                 invoices, itemTracks, invoiceCount, rates, safes, exchanges, partnerWithdrawals,
-                adminLogs, safeTransactions,
                 lastSyncTime: Date.now(),
             };
             await db.ref().update(updates);
@@ -837,7 +862,7 @@ async function loadLocalData() {
         try {
             const updates = {
                 categories, products, expenses, clients, suppliers, retailSales, invoices,
-                itemTracks, invoiceCount, rates, safes, exchanges, partnerWithdrawals, adminLogs,
+                itemTracks, invoiceCount, rates, safes, exchanges, partnerWithdrawals, capitalRecords, adminLogs,
                 safeTransactions,
                 lastSyncTime: Date.now()
             };
@@ -864,12 +889,11 @@ function addSafeTransaction(type, currency, amount, note) {
         date: Date.now()
     });
 
-    if (safeTransactions.length > 5000) {
-        safeTransactions.length = 5000;
+    if (safeTransactions.length > 10000) {
+        safeTransactions.length = 10000;
     }
 
     saveLocalData();
-    try{ if(typeof pushToCloud==='function') pushToCloud(); }catch(e){ console.warn(e); }
 
     renderSafeTransactions();
 
@@ -937,6 +961,14 @@ ${t.amount}
 
     async function initApp() {
         await loadLocalData();
+
+// ID Migration Stage1
+try{
+    clients.forEach(c=>{ if(c && !c.id) c.id = generateUniqueID(); });
+    suppliers.forEach(s=>{ if(s && !s.id) s.id = generateUniqueID(); });
+}catch(e){ console.error(e); }
+
+
         checkConnection();
         window.addEventListener('online', checkConnection);
         window.addEventListener('offline', checkConnection);
@@ -958,30 +990,24 @@ renderSafeTransactions();
                 const data = dataSnapshot.val();
                 if (!data) return;
 
-                try{
-                    localStorage.setItem('cloudBackup_' + Date.now(), JSON.stringify({
-                        products,categories,clients,suppliers,expenses,invoices,
-                        retailSales,itemTracks,rates,safes,exchanges,
-                        partnerWithdrawals,adminLogs,safeTransactions
-                    }));
-                }catch(e){console.warn(e);}
                 isApplyingCloudUpdate = true;
 
-                if (data.products) products = forceArray(data.products);
-                if (data.categories) categories = forceArray(data.categories);
-                if (data.clients) clients = forceArray(data.clients);
-                if (data.suppliers) suppliers = forceArray(data.suppliers);
-                if (data.expenses) expenses = forceArray(data.expenses);
-                if (data.invoices) invoices = forceArray(data.invoices);
-                if (data.retailSales) retailSales = forceArray(data.retailSales);
-                if (data.itemTracks) itemTracks = forceArray(data.itemTracks);
+                products = mergeById(products, forceArray(data.products));
+                categories = forceArray(data.categories);
+                clients = mergeById(clients, forceArray(data.clients));
+                suppliers = mergeById(suppliers, forceArray(data.suppliers));
+                expenses = forceArray(data.expenses);
+                invoices = forceArray(data.invoices);
+                retailSales = forceArray(data.retailSales);
+                itemTracks = forceArray(data.itemTracks);
                 if (data.rates) rates = data.rates;
                 if (data.safes) safes = data.safes;
-                if (data.exchanges) exchanges = forceArray(data.exchanges);
-                if (data.partnerWithdrawals) partnerWithdrawals = forceArray(data.partnerWithdrawals);
+                exchanges = forceArray(data.exchanges);
+                partnerWithdrawals = mergeById(partnerWithdrawals, forceArray(data.partnerWithdrawals));
+        capitalRecords = mergeById(capitalRecords, forceArray(data.capitalRecords));
                 invoiceCount = data.invoiceCount || 0;
-                if (data.adminLogs) adminLogs = forceArray(data.adminLogs);
-                if (data.safeTransactions) safeTransactions = forceArray(data.safeTransactions);
+                adminLogs = forceArray(data.adminLogs);
+                safeTransactions = forceArray(data.safeTransactions);
                 lastSyncTime = data.lastSyncTime || cloudTime;
 
                 await saveLocalData(false);
@@ -1183,7 +1209,9 @@ renderSafeTransactions();
         safes[ex.from] += ex.amountFrom;
         safes[ex.to] = Math.max(0, safes[ex.to] - ex.amountTo);
         exchanges.splice(idx, 1);
-        saveLocalData(); updateExchangeUI(); calculateDashboard();
+        addSafeTransaction('exchange_out', ex.from, ex.amountFrom, `تصريف إلى ${ex.to}`);
+      addSafeTransaction('exchange_in', ex.to, ex.amountTo, `تصريف من ${ex.from}`);
+      saveLocalData(); updateExchangeUI(); calculateDashboard();
         addAdminLog("إلغاء تصريف", `تم التراجع عن تصريف ${ex.amountFrom} ${ex.from}`);
     }
 
@@ -1269,7 +1297,8 @@ renderSafeTransactions();
                 const balanceBefore = client.balance || 0;
                 client.balance = (client.balance || 0) + remainingDebt;
                 if (!client.transactions) client.transactions = [];
-                client.transactions.unshift({
+                if(!Array.isArray(client.transactions)) client.transactions=[];
+    client.transactions.unshift({
                     id: transId,
                     type: 'retail',
                     amount: remainingDebt,
@@ -1314,10 +1343,10 @@ renderSafeTransactions();
 
     function deleteRetailSale(id) { 
         if (!confirm("هل تريد إلغاء هذه البيعة واسترجاعها؟")) return; 
-        const idx = retailSales.findIndex(r => r && r.id === id); if (idx === -1) return; 
-        const sale = retailSales[idx]; const prod = products.find(p => p && p.id === sale.prodId); 
+        const idx = retailSales.findIndex(r => r && r.id === id); if (idx === -1) return; if(!Array.isArray(retailSales)) return; 
+        const sale = retailSales[idx]; const prod = Array.isArray(products) ? products.find(p => p && p.id === sale.prodId) : null; 
         
-        if (prod) { prod.stock += sale.qty; addTrackRecord(prod.id, prod.name, 'استرجاع', sale.qty, 'إلغاء بيع مفرق'); } 
+        if (prod) { prod.stock = Math.max(0, Number(prod.stock||0) + Number(sale.qty||0)); addTrackRecord(prod.id, prod.name, 'استرجاع', sale.qty, 'إلغاء بيع مفرق'); } 
         
         if (sale.payType === 'debt' && sale.clientName) {
             const client = clients.find(c => c && c.name === sale.clientName);
@@ -1330,7 +1359,7 @@ renderSafeTransactions();
         }
 
         let curr = sale.currency || 'usd';
-        let paid = Number(sale.actualPaid || 0);
+        let paid = Math.max(0, Number(sale.actualPaid || 0));
         if (paid > 0) { safes[curr] = Math.max(0, (safes[curr] || 0) - paid); }
         if (paid > 0) {
     addSafeTransaction(
@@ -1445,7 +1474,7 @@ renderSafeTransactions();
     }
 
     function shareWhatsApp() { 
-        if(currentInvoiceItems.length === 0) return alert("الفاتورة فارغة!"); 
+        if(!Array.isArray(currentInvoiceItems) || currentInvoiceItems.length === 0) return alert("الفاتورة فارغة!"); 
         let invNum = editingInvoiceId ? document.getElementById('inv-id-display').innerText : String(invoiceCount).padStart(5, '0'); 
         let clientName = document.getElementById('inv-client-select').value; 
         let text = `*وكالة الفارس لقطع الدراجات النارية* 🏍️\n------------------------\n📄 فاتورة رقم: ${invNum}\n👤 العميل: ${clientName}\n\n*تفاصيل المشتريات:*\n`; 
@@ -1465,7 +1494,7 @@ document.getElementById('inv-currency').selectedIndex
     }
 
     function saveAndPrintInvoice() { 
-        if(currentInvoiceItems.length === 0) return alert("الفاتورة فارغة!"); 
+        if(!Array.isArray(currentInvoiceItems) || currentInvoiceItems.length === 0) return alert("الفاتورة فارغة!"); 
         const clientName = document.getElementById('inv-client-select').value; 
         const total = parseFloat(document.getElementById('invoice-total').innerText);
         const discount = parseFloat(document.getElementById('inv-discount')?.value) || 0;
@@ -1496,17 +1525,17 @@ document.getElementById('inv-currency').selectedIndex
             if (editingInvoiceId) { 
                 const oldInvIndex = invoices.findIndex(i => i && i.id === editingInvoiceId); 
                 if(oldInvIndex !== -1) { 
-                    let oldInv = invoices[oldInvIndex]; 
-                    for (let oldItem of oldInv.items) { 
+                    let oldInv = invoices[oldInvIndex]; if(!oldInv){ throw new Error('OLD_INVOICE_NOT_FOUND'); } 
+                    for (let oldItem of (oldInv.items || [])) { 
                         let p = products.find(x => x && x.id == oldItem.prodId); 
                         if(p) { p.stock += oldItem.qty; addTrackRecord(p.id, p.name, 'تعديل فاتورة', oldItem.qty, `تعديل #${oldInv.number}`); } 
                     } 
-                    if(oldInv.remaining > 0) { 
+                    if(oldInv && Number(oldInv.remaining||0) > 0) { 
                         let c = clients.find(x => x && x.name === oldInv.clientName); 
                         if(c) {
-                            c.balance = Math.max(0, c.balance - oldInv.remaining); 
-                            if(c.transactions && oldInv.transId) {
-                                c.transactions = c.transactions.filter(t => t.id !== oldInv.transId);
+                            c.balance = Math.max(0, Number(c.balance||0) - Number(oldInv.remaining||0)); 
+                            if(Array.isArray(c.transactions) && oldInv.transId) {
+                                c.transactions = (c.transactions||[]).filter(t => t && t.id !== oldInv.transId);
                             }
                         }
                     } 
@@ -1516,7 +1545,7 @@ document.getElementById('inv-currency').selectedIndex
             }
             
             let currentProfit = 0; 
-            for (let item of currentInvoiceItems) { 
+            for (let item of (Array.isArray(currentInvoiceItems)?currentInvoiceItems:[])) { 
                 let p = products.find(x => x && x.id == item.prodId); 
                if (!p) {
     alert('المنتج غير موجود');
@@ -1654,17 +1683,17 @@ addTrackRecord(
         if(!confirm("حذف هذه الفاتورة نهائياً؟ سيتم استرجاع البضاعة.")) return; 
         const oldInvIndex = invoices.findIndex(i => i && i.id == id); 
         if(oldInvIndex !== -1) { 
-            let oldInv = invoices[oldInvIndex]; 
-            for (let oldItem of oldInv.items) { 
+            let oldInv = invoices[oldInvIndex]; if(!oldInv){ throw new Error('OLD_INVOICE_NOT_FOUND'); } 
+            for (let oldItem of (oldInv.items || [])) { 
                 let p = products.find(x => x && x.id == oldItem.prodId); 
                 if(p) { p.stock += oldItem.qty; addTrackRecord(p.id, p.name, 'استرجاع', oldItem.qty, `إلغاء فاتورة #${oldInv.number}`); } 
             } 
-            if(oldInv.remaining > 0) { 
+            if(oldInv && Number(oldInv.remaining||0) > 0) { 
                 let c = clients.find(x => x && x.name === oldInv.clientName); 
                 if(c) {
-                    c.balance = Math.max(0, c.balance - oldInv.remaining); 
-                    if(c.transactions && oldInv.transId) {
-                        c.transactions = c.transactions.filter(t => t.id !== oldInv.transId);
+                    c.balance = Math.max(0, Number(c.balance||0) - Number(oldInv.remaining||0)); 
+                    if(Array.isArray(c.transactions) && oldInv.transId) {
+                        c.transactions = (c.transactions||[]).filter(t => t && t.id !== oldInv.transId);
                     }
                 } 
             } 
@@ -1982,7 +2011,51 @@ addTrackRecord(
         if(document.getElementById('total-abuabdo')) document.getElementById('total-abuabdo').innerText = t2.toFixed(2) + " $";
     }
 
-    function savePartnerWithdrawal() {
+    
+function renderCapital(){
+ const el=document.getElementById('capital-list'); if(!el) return;
+
+ const totals={usd:0,try:0,syp:0};
+ (capitalRecords||[]).forEach(r=>{
+   const c=(r.currency||'').toLowerCase();
+   totals[c]=(totals[c]||0)+(parseFloat(r.amount)||0);
+ });
+
+ el.innerHTML=`
+ <div class="list-item"><b>إجمالي USD:</b> ${totals.usd||0}</div>
+ <div class="list-item"><b>إجمالي TRY:</b> ${totals.try||0}</div>
+ <div class="list-item"><b>إجمالي SYP:</b> ${totals.syp||0}</div>
+ `+(capitalRecords||[]).map((r,i)=>`
+ <div class="list-item">
+ <div><b>#${r.id||i}</b></div>
+ <div>الشريك: ${r.partner||'-'}</div>
+ <div>المبلغ: ${r.amount} ${r.currency}</div>
+ <div>الملاحظة: ${r.note||'-'}</div>
+ <div>التاريخ: ${r.date||'-'}</div>
+ <button onclick="deleteCapital(${i})">حذف</button>
+ </div>`).join('');
+}
+function saveCapitalRecord(){
+ const partner=document.getElementById('capital-name').value;
+ const note=document.getElementById('capital-note').value;
+ const amount=parseFloat(document.getElementById('capital-amount').value);
+ const curr=document.getElementById('capital-currency').value;
+ if(!(amount>0)) return;
+ safes[curr]=(safes[curr]||0)+amount;
+ capitalRecords.unshift({id:generateUniqueID(),partner,note,amount,currency:curr,date:new Date().toLocaleString('ar-EG')});
+ addSafeTransaction('capital',curr,amount,'إضافة رأس مال: '+partner);
+ saveLocalData(); renderCapital(); calculateDashboard(); updateAllUI && updateAllUI();
+}
+function deleteCapital(idx){
+ const r=capitalRecords[idx]; if(!r) return; if(!confirm('هل تريد حذف عملية رأس المال؟')) return;
+ if((safes[r.currency]||0)<r.amount) return alert('الرصيد لا يكفي للإلغاء');
+ safes[r.currency]-=r.amount;
+ addSafeTransaction('withdraw',r.currency,r.amount,'إلغاء رأس مال: '+r.partner);
+ capitalRecords.splice(idx,1);
+ saveLocalData(); renderCapital(); calculateDashboard(); updateAllUI && updateAllUI();
+}
+
+function savePartnerWithdrawal() {
         const partner = document.getElementById('partner-name').value, note = document.getElementById('partner-note').value, amount = parseFloat(document.getElementById('partner-amount').value), curr = document.getElementById('partner-currency').value;
         if(amount > 0) {
             if ((safes[curr] || 0) < amount) return alert("الرصيد في الصندوق لا يكفي!");
@@ -2032,7 +2105,7 @@ renderSafeTransactions();
         const phone = document.getElementById('client-phone').value; 
         if(name) { 
             if(clients.some(c => c && c.name.trim() === name.trim())) return alert("العميل موجود مسبقاً");
-            clients.push({ name, phone, balance: 0, transactions: [] });
+            clients.push({ id: generateUniqueID(), name, phone, balance: 0, transactions: [] });
             saveLocalData(); updateClientsUI(); 
             document.getElementById('client-name').value = ''; document.getElementById('client-phone').value = ''; 
         } 
@@ -2081,7 +2154,7 @@ renderSafeTransactions();
         const phone = document.getElementById('supplier-phone').value; 
         if(name) { 
             if(suppliers.some(s => s && s.name.trim() === name.trim())) return alert("المورد موجود مسبقاً");
-            suppliers.push({name, phone, balance: 0}); 
+            suppliers.push({ id: generateUniqueID(), name, phone, balance: 0}); 
             saveLocalData(); updateSuppliersUI(); 
             document.getElementById('supplier-name').value = ''; document.getElementById('supplier-phone').value = '';
         } 
@@ -2097,6 +2170,12 @@ renderSafeTransactions();
         if(amount > 0) { 
             if (safes.usd < amount) return alert("الرصيد في صندوق الدولار لا يكفي!");
             safes.usd -= amount; suppliers[idx].balance = Math.max(0, suppliers[idx].balance - amount); 
+            addSafeTransaction(
+                'withdraw',
+                'usd',
+                amount,
+                `تسديد دين المورد: ${suppliers[idx].name}`
+            );
             saveLocalData(); calculateDashboard(); updateSuppliersUI(); alert("تم الخصم من صندوق الدولار والتسديد.");
         } 
     }
@@ -2109,7 +2188,7 @@ renderSafeTransactions();
     function exportBackup() {
         const backupData = {
             products, categories, clients, suppliers, expenses, invoices, retailSales,
-            itemTracks, rates, safes, exchanges, partnerWithdrawals, invoiceCount, adminLogs,
+            itemTracks, rates, safes, exchanges, partnerWithdrawals, capitalRecords, invoiceCount, adminLogs,
             lastSyncTime, backupDate: new Date().toISOString()
         };
         const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
@@ -2185,7 +2264,7 @@ renderSafeTransactions();
 
     const balanceBefore = client.balance || 0;
 
-    client.balance -= amountUsd;
+    client.balance = Math.max(0,(client.balance||0) - amountUsd);
 
     safes[currency] =
         (safes[currency] || 0) + amount;
@@ -2193,6 +2272,7 @@ renderSafeTransactions();
     if (!client.transactions)
         client.transactions = [];
 
+    if(!Array.isArray(client.transactions)) client.transactions=[];
     client.transactions.unshift({
         id: generateUniqueID(),
         type: "payment",
@@ -2204,12 +2284,8 @@ renderSafeTransactions();
         balanceBefore: balanceBefore,
         balanceAfter: client.balance
     });
-addSafeTransaction(
-    'invoice',
-    currency,
-    amount,
-    `تسديد دين العميل: ${client.name}`
-);
+
+    addSafeTransaction('invoice', currency, amount, `تسديد دين العميل: ${client.name}`);
     saveLocalData();
     updateClientsUI();
     calculateDashboard();
