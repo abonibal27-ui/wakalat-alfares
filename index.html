@@ -13,7 +13,987 @@
 <meta name="apple-mobile-web-app-title" content="وكالة الفارس">
 <title>وكالة الفارس - أونلاين</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js">
+/* ===== V3 STAGE96 APPSTORE PERSISTENCE ===== */
+window.AppStore = window.AppStore || {
+  state:{},
+  get(k){ return this.state[k]; },
+  set(k,v){ this.state[k]=v; return v; }
+};
+
+window.RealMigrationEntry = window.RealMigrationEntry || {};
+
+RealMigrationEntry.migrateProduct = function(payload){
+  const items = AppStore.get('v3_products') || [];
+  items.push({...payload, migratedAt:new Date().toISOString()});
+  AppStore.set('v3_products', items);
+  return payload;
+};
+
+RealMigrationEntry.migrateSale = function(payload){
+  const items = AppStore.get('v3_sales') || [];
+  items.push({...payload, migratedAt:new Date().toISOString()});
+  AppStore.set('v3_sales', items);
+  return payload;
+};
+
+RealMigrationEntry.migrateInvoice = function(payload){
+  const items = AppStore.get('v3_invoices') || [];
+  items.push({...payload, migratedAt:new Date().toISOString()});
+  AppStore.set('v3_invoices', items);
+  return payload;
+};
+
+window.__V3_DATA_PERSISTENCE_READY__ = true;
+/* ===== END STAGE96 ===== */
+
+
+/* ===== V3 STAGE97 STATE SYNCHRONIZER ===== */
+window.V3StateSynchronizer = window.V3StateSynchronizer || {
+  reports: [],
+
+  sync(){
+    const report = {
+      productsLegacy: Array.isArray(window.products) ? window.products.length : 0,
+      productsV3: (window.AppStore?.get?.('v3_products') || []).length,
+
+      salesLegacy: Array.isArray(window.retailSales) ? window.retailSales.length : 0,
+      salesV3: (window.AppStore?.get?.('v3_sales') || []).length,
+
+      invoicesLegacy: Array.isArray(window.invoices) ? window.invoices.length : 0,
+      invoicesV3: (window.AppStore?.get?.('v3_invoices') || []).length,
+
+      timestamp: new Date().toISOString()
+    };
+
+    this.reports.push(report);
+    return report;
+  }
+};
+
+window.__lastV3SyncReport = V3StateSynchronizer.sync();
+/* ===== END STAGE97 ===== */
+
+
+/* ===== V3 STAGE98 DATA DIFF ANALYZER ===== */
+window.DataDiffAnalyzer = window.DataDiffAnalyzer || {
+  reports: [],
+
+  analyze(){
+    const v3Products = window.AppStore?.get?.('v3_products') || [];
+    const v3Sales = window.AppStore?.get?.('v3_sales') || [];
+    const v3Invoices = window.AppStore?.get?.('v3_invoices') || [];
+
+    const report = {
+      productCountDiff: (window.products?.length || 0) - v3Products.length,
+      salesCountDiff: (window.retailSales?.length || 0) - v3Sales.length,
+      invoiceCountDiff: (window.invoices?.length || 0) - v3Invoices.length,
+      timestamp: new Date().toISOString()
+    };
+
+    this.reports.push(report);
+    return report;
+  }
+};
+
+window.__lastDataDiffReport = DataDiffAnalyzer.analyze();
+/* ===== END STAGE98 ===== */
+
+
+/* ===== V3 STAGE99 RECORD DIFF ANALYZER ===== */
+window.RecordDiffAnalyzer = window.RecordDiffAnalyzer || {
+  reports: [],
+
+  analyze(){
+    const legacyProduct = (window.products || [])[0] || null;
+    const v3Product = (window.AppStore?.get?.('v3_products') || [])[0] || null;
+
+    const report = {
+      firstProductNameMatch:
+        !!legacyProduct && !!v3Product
+          ? String(legacyProduct.name || '') === String(v3Product.name || '')
+          : null,
+
+      firstProductStockMatch:
+        !!legacyProduct && !!v3Product
+          ? Number(legacyProduct.stock || 0) === Number(v3Product.stock || 0)
+          : null,
+
+      timestamp: new Date().toISOString()
+    };
+
+    this.reports.push(report);
+    return report;
+  }
+};
+
+window.__lastRecordDiffReport = RecordDiffAnalyzer.analyze();
+/* ===== END STAGE99 ===== */
+
+
+/* ===== V3 STAGE100 CUTOVER CONTROLLER ===== */
+window.CutoverController = window.CutoverController || {
+  flags:{
+    products:false,
+    sales:false,
+    invoices:false
+  },
+
+  enable(area){
+    this.flags[area] = true;
+  },
+
+  disable(area){
+    this.flags[area] = false;
+  },
+
+  isEnabled(area){
+    return !!this.flags[area];
+  },
+
+  status(){
+    return {...this.flags};
+  }
+};
+
+window.__CUTOVER_CONTROLLER_READY__ = true;
+window.__cutoverStatus = CutoverController.status();
+/* ===== END STAGE100 ===== */
+
+
+/* ===== V3 STAGE101 AUTO CUTOVER ENGINE ===== */
+window.AutoCutoverEngine = window.AutoCutoverEngine || {
+  evaluate(){
+    const report = window.__lastRecordDiffReport || {};
+
+    if(report.firstProductNameMatch === true &&
+       report.firstProductStockMatch === true){
+      window.CutoverController?.enable?.('products');
+      return 'products-enabled';
+    }
+
+    return 'waiting';
+  }
+};
+
+window.__autoCutoverResult = AutoCutoverEngine.evaluate();
+/* ===== END STAGE101 ===== */
+
+
+/* ===== V3 STAGE102 PRODUCT CUTOVER HOOK ===== */
+(function(){
+  const originalSaveProduct = window.saveProduct;
+
+  if(typeof originalSaveProduct === 'function'){
+    window.saveProduct = function(){
+      if(window.CutoverController?.isEnabled?.('products')){
+        try{
+          window.RealMigrationEntry?.migrateProduct?.({
+            cutover:true,
+            source:'saveProduct'
+          });
+          window.__PRODUCT_CUTOVER_ACTIVE__ = true;
+        }catch(e){}
+      }
+
+      return originalSaveProduct.apply(this, arguments);
+    };
+  }
+})();
+/* ===== END STAGE102 ===== */
+
+
+/* ===== V3 STAGE103 SALES CUTOVER HOOK ===== */
+(function(){
+  const originalSubmitRetailSale = window.submitRetailSale;
+
+  if(typeof originalSubmitRetailSale === 'function'){
+    window.submitRetailSale = function(){
+      if(window.CutoverController?.isEnabled?.('sales')){
+        try{
+          window.RealMigrationEntry?.migrateSale?.({
+            cutover:true,
+            source:'submitRetailSale'
+          });
+          window.__SALES_CUTOVER_ACTIVE__ = true;
+        }catch(e){}
+      }
+
+      return originalSubmitRetailSale.apply(this, arguments);
+    };
+  }
+})();
+/* ===== END STAGE103 ===== */
+
+
+/* ===== V3 STAGE104 INVOICE CUTOVER HOOK ===== */
+(function(){
+  const originalSaveAndPrintInvoice = window.saveAndPrintInvoice;
+
+  if(typeof originalSaveAndPrintInvoice === 'function'){
+    window.saveAndPrintInvoice = function(){
+      if(window.CutoverController?.isEnabled?.('invoices')){
+        try{
+          window.RealMigrationEntry?.migrateInvoice?.({
+            cutover:true,
+            source:'saveAndPrintInvoice'
+          });
+          window.__INVOICE_CUTOVER_ACTIVE__ = true;
+        }catch(e){}
+      }
+
+      return originalSaveAndPrintInvoice.apply(this, arguments);
+    };
+  }
+})();
+/* ===== END STAGE104 ===== */
+
+
+/* ===== V3 STAGE105 SELECTIVE LEGACY BYPASS ===== */
+window.LegacyBypassController = window.LegacyBypassController || {
+  shouldBypass(area){
+    return window.CutoverController?.isEnabled?.(area) === true;
+  }
+};
+
+(function(){
+  const originalSaveProduct = window.saveProduct;
+
+  if(typeof originalSaveProduct === 'function'){
+    window.saveProduct = function(){
+      if(window.LegacyBypassController.shouldBypass('products')){
+        window.__PRODUCT_LEGACY_BYPASSED__ = true;
+        return { bypassed:true, area:'products' };
+      }
+      return originalSaveProduct.apply(this, arguments);
+    };
+  }
+})();
+
+window.__LEGACY_BYPASS_READY__ = true;
+/* ===== END STAGE105 ===== */
+
+
+/* ===== V3 STAGE106 SALES LEGACY BYPASS ===== */
+(function(){
+  const originalSubmitRetailSale = window.submitRetailSale;
+
+  if(typeof originalSubmitRetailSale === 'function'){
+    window.submitRetailSale = function(){
+      if(window.LegacyBypassController?.shouldBypass?.('sales')){
+        window.__SALES_LEGACY_BYPASSED__ = true;
+        return { bypassed:true, area:'sales' };
+      }
+      return originalSubmitRetailSale.apply(this, arguments);
+    };
+  }
+})();
+/* ===== END STAGE106 ===== */
+
+
+/* ===== V3 STAGE107 INVOICE LEGACY BYPASS ===== */
+(function(){
+  const originalSaveAndPrintInvoice = window.saveAndPrintInvoice;
+
+  if(typeof originalSaveAndPrintInvoice === 'function'){
+    window.saveAndPrintInvoice = function(){
+      if(window.LegacyBypassController?.shouldBypass?.('invoices')){
+        window.__INVOICE_LEGACY_BYPASSED__ = true;
+        return { bypassed:true, area:'invoices' };
+      }
+      return originalSaveAndPrintInvoice.apply(this, arguments);
+    };
+  }
+})();
+/* ===== END STAGE107 ===== */
+
+
+/* ===== V3 STAGE108 REAL MIGRATION EXECUTION ===== */
+window.AppStore = window.AppStore || {
+  state:{},
+  get(k){ return this.state[k]; },
+  set(k,v){ this.state[k]=v; return v; }
+};
+
+window.RealMigrationEntry = window.RealMigrationEntry || {};
+
+RealMigrationEntry.migrateProduct = function(payload){
+  const products = AppStore.get('v3_products') || [];
+  products.push(payload);
+  AppStore.set('v3_products', products);
+  return {success:true,type:'product'};
+};
+
+RealMigrationEntry.migrateSale = function(payload){
+  const sales = AppStore.get('v3_sales') || [];
+  sales.push(payload);
+  AppStore.set('v3_sales', sales);
+
+  const movements = AppStore.get('v3_inventory_movements') || [];
+  movements.push({
+    productId: payload.productId || null,
+    quantity: payload.quantity || 0,
+    type:'sale'
+  });
+  AppStore.set('v3_inventory_movements', movements);
+
+  return {success:true,type:'sale'};
+};
+
+RealMigrationEntry.migrateInvoice = function(payload){
+  const invoices = AppStore.get('v3_invoices') || [];
+  invoices.push(payload);
+  AppStore.set('v3_invoices', invoices);
+
+  const ledger = AppStore.get('v3_customer_ledger') || [];
+  ledger.push({
+    clientName: payload.clientName || '',
+    total: payload.total || 0
+  });
+  AppStore.set('v3_customer_ledger', ledger);
+
+  return {success:true,type:'invoice'};
+};
+
+window.__V3_EXECUTION_ENGINE_READY__ = true;
+/* ===== END STAGE108 ===== */
+
+
+/* ===== V3 STAGE109 INVENTORY ENGINE ===== */
+window.V3InventoryEngine = window.V3InventoryEngine || {
+  applySale(productId, quantity){
+    const products = window.AppStore.get('v3_products') || [];
+    const idx = products.findIndex(p => p && p.id == productId);
+
+    if(idx >= 0){
+      products[idx].stock = Number(products[idx].stock || 0) - Number(quantity || 0);
+      window.AppStore.set('v3_products', products);
+      return true;
+    }
+    return false;
+  }
+};
+
+if(window.RealMigrationEntry){
+  const oldSale = window.RealMigrationEntry.migrateSale;
+
+  window.RealMigrationEntry.migrateSale = function(payload){
+    const result = oldSale ? oldSale(payload) : {success:true};
+    window.V3InventoryEngine.applySale(payload.productId, payload.quantity);
+    return result;
+  };
+}
+
+window.__V3_INVENTORY_ENGINE_READY__ = true;
+/* ===== END STAGE109 ===== */
+
+
+/* ===== V3 STAGE110 SAFE ENGINE ===== */
+window.V3SafeEngine = window.V3SafeEngine || {
+  register(amount, currency){
+    const safe = window.AppStore.get('v3_safe') || [];
+    safe.push({
+      amount:Number(amount||0),
+      currency:currency||'USD',
+      ts:new Date().toISOString()
+    });
+    window.AppStore.set('v3_safe', safe);
+    return true;
+  }
+};
+
+if(window.RealMigrationEntry){
+  const oldSale = window.RealMigrationEntry.migrateSale;
+
+  window.RealMigrationEntry.migrateSale = function(payload){
+    const result = oldSale ? oldSale(payload) : {success:true};
+    if(payload && payload.paidAmount){
+      window.V3SafeEngine.register(payload.paidAmount, payload.currency);
+    }
+    return result;
+  };
+}
+
+window.__V3_SAFE_ENGINE_READY__ = true;
+/* ===== END STAGE110 ===== */
+
+
+/* ===== V3 STAGE111 CUSTOMER BALANCE ENGINE ===== */
+window.V3CustomerBalanceEngine = window.V3CustomerBalanceEngine || {
+  apply(clientName, amount){
+    const balances = window.AppStore.get('v3_customer_balances') || {};
+
+    balances[clientName || 'UNKNOWN'] =
+      Number(balances[clientName || 'UNKNOWN'] || 0) + Number(amount || 0);
+
+    window.AppStore.set('v3_customer_balances', balances);
+    return balances[clientName || 'UNKNOWN'];
+  }
+};
+
+if(window.RealMigrationEntry){
+  const oldInvoice = window.RealMigrationEntry.migrateInvoice;
+
+  window.RealMigrationEntry.migrateInvoice = function(payload){
+    const result = oldInvoice ? oldInvoice(payload) : {success:true};
+
+    const debt =
+      Number(payload?.total || 0) - Number(payload?.paidAmount || 0);
+
+    if(debt > 0){
+      window.V3CustomerBalanceEngine.apply(
+        payload?.clientName,
+        debt
+      );
+    }
+
+    return result;
+  };
+}
+
+window.__V3_CUSTOMER_BALANCE_ENGINE_READY__ = true;
+/* ===== END STAGE111 ===== */
+
+
+/* ===== V3 STAGE112 TRANSACTION CONSISTENCY ENGINE ===== */
+window.V3TransactionEngine = window.V3TransactionEngine || {
+  log: [],
+
+  execute(type, handler){
+    const tx = {
+      type:type,
+      startedAt:new Date().toISOString(),
+      success:false
+    };
+
+    try{
+      const result = handler();
+      tx.success = true;
+      tx.result = result;
+    }catch(err){
+      tx.error = String(err);
+    }
+
+    tx.finishedAt = new Date().toISOString();
+    this.log.push(tx);
+    return tx;
+  }
+};
+
+if(window.RealMigrationEntry){
+  const oldSale = window.RealMigrationEntry.migrateSale;
+  window.RealMigrationEntry.migrateSale = function(payload){
+    return window.V3TransactionEngine.execute('sale', () =>
+      oldSale ? oldSale(payload) : {success:true}
+    );
+  };
+
+  const oldInvoice = window.RealMigrationEntry.migrateInvoice;
+  window.RealMigrationEntry.migrateInvoice = function(payload){
+    return window.V3TransactionEngine.execute('invoice', () =>
+      oldInvoice ? oldInvoice(payload) : {success:true}
+    );
+  };
+}
+
+window.__V3_TRANSACTION_ENGINE_READY__ = true;
+/* ===== END STAGE112 ===== */
+
+
+/* ===== V3 STAGE113 ROLLBACK ENGINE ===== */
+window.V3RollbackEngine = window.V3RollbackEngine || {
+  snapshots: [],
+
+  snapshot(){
+    const state = JSON.stringify(window.AppStore?.state || {});
+    this.snapshots.push(state);
+    return true;
+  },
+
+  rollback(){
+    const last = this.snapshots.pop();
+    if(last){
+      window.AppStore.state = JSON.parse(last);
+      return true;
+    }
+    return false;
+  }
+};
+
+if(window.V3TransactionEngine){
+  const oldExecute = window.V3TransactionEngine.execute;
+
+  window.V3TransactionEngine.execute = function(type, handler){
+    window.V3RollbackEngine.snapshot();
+
+    const tx = oldExecute.call(this, type, handler);
+
+    if(!tx.success){
+      window.V3RollbackEngine.rollback();
+    }
+
+    return tx;
+  };
+}
+
+window.__V3_ROLLBACK_ENGINE_READY__ = true;
+/* ===== END STAGE113 ===== */
+
+
+/* ===== V3 STAGE114 CONSISTENCY VALIDATOR ===== */
+window.V3ConsistencyValidator = window.V3ConsistencyValidator || {
+  validate(){
+    const products = window.AppStore?.get?.('v3_products') || [];
+
+    for(const p of products){
+      if(Number(p?.stock || 0) < 0){
+        throw new Error('Negative stock detected');
+      }
+    }
+
+    const balances = window.AppStore?.get?.('v3_customer_balances') || {};
+    for(const k in balances){
+      if(!Number.isFinite(Number(balances[k]))){
+        throw new Error('Invalid customer balance');
+      }
+    }
+
+    return true;
+  }
+};
+
+if(window.V3TransactionEngine){
+  const oldExecute = window.V3TransactionEngine.execute;
+
+  window.V3TransactionEngine.execute = function(type, handler){
+    const tx = oldExecute.call(this, type, handler);
+
+    try{
+      window.V3ConsistencyValidator.validate();
+    }catch(err){
+      tx.success = false;
+      tx.validationError = String(err);
+
+      if(window.V3RollbackEngine){
+        window.V3RollbackEngine.rollback();
+      }
+    }
+
+    return tx;
+  };
+}
+
+window.__V3_CONSISTENCY_VALIDATOR_READY__ = true;
+/* ===== END STAGE114 ===== */
+
+
+/* ===== V3 STAGE115 AUDIT & RECOVERY CENTER ===== */
+window.V3AuditRecoveryCenter = window.V3AuditRecoveryCenter || {
+  auditLog: [],
+
+  record(type, data){
+    this.auditLog.push({
+      type:type,
+      data:data,
+      timestamp:new Date().toISOString()
+    });
+  },
+
+  latest(){
+    return this.auditLog[this.auditLog.length - 1] || null;
+  }
+};
+
+if(window.V3TransactionEngine){
+  const oldExecute = window.V3TransactionEngine.execute;
+
+  window.V3TransactionEngine.execute = function(type, handler){
+    const result = oldExecute.call(this, type, handler);
+
+    window.V3AuditRecoveryCenter.record('transaction', {
+      operation:type,
+      success:!!result.success
+    });
+
+    if(!result.success){
+      window.V3AuditRecoveryCenter.record('failure', {
+        operation:type,
+        error: result.error || result.validationError || null
+      });
+    }
+
+    return result;
+  };
+}
+
+window.__V3_AUDIT_RECOVERY_READY__ = true;
+/* ===== END STAGE115 ===== */
+
+
+/* ===== V3 STAGE116 CUTOVER READINESS ANALYZER ===== */
+window.V3CutoverReadinessAnalyzer = window.V3CutoverReadinessAnalyzer || {
+  analyze(){
+    const audit = window.V3AuditRecoveryCenter?.auditLog || [];
+
+    const failures = audit.filter(x => x.type === 'failure').length;
+    const transactions = audit.filter(x => x.type === 'transaction').length;
+
+    const readiness = {
+      products: failures === 0,
+      sales: failures === 0 && transactions > 0,
+      invoices: failures === 0 && transactions > 0,
+      score: transactions === 0 ? 0 : Math.max(0, 100 - (failures * 10))
+    };
+
+    window.__V3_CUTOVER_READINESS__ = readiness;
+    return readiness;
+  }
+};
+
+window.__V3_CUTOVER_READINESS__ =
+  window.V3CutoverReadinessAnalyzer.analyze();
+
+window.__V3_CUTOVER_ANALYZER_READY__ = true;
+/* ===== END STAGE116 ===== */
+
+
+/* ===== V3 STAGE117 AUTOMATIC CUTOVER POLICY ENGINE ===== */
+window.V3AutomaticCutoverPolicyEngine = window.V3AutomaticCutoverPolicyEngine || {
+  apply(){
+    const readiness = window.__V3_CUTOVER_READINESS__ || {};
+
+    if(window.CutoverController){
+      readiness.products
+        ? window.CutoverController.enable('products')
+        : window.CutoverController.disable('products');
+
+      readiness.sales
+        ? window.CutoverController.enable('sales')
+        : window.CutoverController.disable('sales');
+
+      readiness.invoices
+        ? window.CutoverController.enable('invoices')
+        : window.CutoverController.disable('invoices');
+    }
+
+    return window.CutoverController?.status?.() || {};
+  }
+};
+
+window.__AUTO_CUTOVER_POLICY_RESULT__ =
+  window.V3AutomaticCutoverPolicyEngine.apply();
+
+window.__V3_AUTO_CUTOVER_POLICY_READY__ = true;
+/* ===== END STAGE117 ===== */
+
+
+/* ===== V3 STAGE118 BUSINESS PARITY HARNESS ===== */
+window.V3BusinessParityHarness = window.V3BusinessParityHarness || {
+  results: [],
+
+  compare(operation, legacyResult, v3Result){
+    const report = {
+      operation,
+      legacyExists: legacyResult != null,
+      v3Exists: v3Result != null,
+      timestamp: new Date().toISOString()
+    };
+
+    this.results.push(report);
+    return report;
+  }
+};
+
+window.__V3_PARITY_HARNESS_READY__ = true;
+/* ===== END STAGE118 ===== */
+
+
+/* ===== V3 STAGE119 PARITY EXECUTION HOOKS ===== */
+(function(){
+  const harness = window.V3BusinessParityHarness;
+  if(!harness) return;
+
+  const wrap = (fnName, op) => {
+    const original = window[fnName];
+    if(typeof original !== 'function') return;
+
+    window[fnName] = function(){
+      const legacyResult = original.apply(this, arguments);
+
+      let v3Result = null;
+      try {
+        if(op === 'product'){
+          v3Result = window.AppStore?.get?.('v3_products');
+        } else if(op === 'sale'){
+          v3Result = window.AppStore?.get?.('v3_sales');
+        } else if(op === 'invoice'){
+          v3Result = window.AppStore?.get?.('v3_invoices');
+        }
+      } catch(e){}
+
+      harness.compare(op, legacyResult, v3Result);
+      return legacyResult;
+    };
+  };
+
+  wrap('saveProduct', 'product');
+  wrap('submitRetailSale', 'sale');
+  wrap('saveAndPrintInvoice', 'invoice');
+})();
+
+window.__V3_PARITY_EXECUTION_HOOKS_READY__ = true;
+/* ===== END STAGE119 ===== */
+
+
+/* ===== V3 STAGE120 BUSINESS DIFF REPORTER ===== */
+window.V3BusinessDiffReporter = window.V3BusinessDiffReporter || {
+  reports: [],
+
+  analyze(){
+    const legacyProducts = window.products || [];
+    const v3Products = window.AppStore?.get?.('v3_products') || [];
+
+    const report = {
+      legacyProductsCount: legacyProducts.length,
+      v3ProductsCount: v3Products.length,
+      productsCountMatch: legacyProducts.length === v3Products.length,
+
+      firstProductNameMatch:
+        legacyProducts[0] && v3Products[0]
+          ? String(legacyProducts[0].name || '') === String(v3Products[0].name || '')
+          : null,
+
+      firstProductStockMatch:
+        legacyProducts[0] && v3Products[0]
+          ? Number(legacyProducts[0].stock || 0) === Number(v3Products[0].stock || 0)
+          : null,
+
+      timestamp: new Date().toISOString()
+    };
+
+    this.reports.push(report);
+    window.__LAST_BUSINESS_DIFF_REPORT__ = report;
+    return report;
+  }
+};
+
+window.__LAST_BUSINESS_DIFF_REPORT__ =
+  window.V3BusinessDiffReporter.analyze();
+
+window.__V3_BUSINESS_DIFF_REPORTER_READY__ = true;
+/* ===== END STAGE120 ===== */
+
+
+/* ===== V3 STAGE121 SALES DIFF REPORTER ===== */
+window.V3SalesDiffReporter = window.V3SalesDiffReporter || {
+  reports: [],
+
+  analyze(){
+    const legacySales = window.retailSales || [];
+    const v3Sales = window.AppStore?.get?.('v3_sales') || [];
+
+    const report = {
+      legacySalesCount: legacySales.length,
+      v3SalesCount: v3Sales.length,
+      salesCountMatch: legacySales.length === v3Sales.length,
+
+      firstSaleExistsLegacy: !!legacySales[0],
+      firstSaleExistsV3: !!v3Sales[0],
+
+      timestamp: new Date().toISOString()
+    };
+
+    this.reports.push(report);
+    window.__LAST_SALES_DIFF_REPORT__ = report;
+    return report;
+  }
+};
+
+window.__LAST_SALES_DIFF_REPORT__ =
+  window.V3SalesDiffReporter.analyze();
+
+window.__V3_SALES_DIFF_REPORTER_READY__ = true;
+/* ===== END STAGE121 ===== */
+
+
+/* ===== V3 STAGE122 INVOICE DIFF REPORTER ===== */
+window.V3InvoiceDiffReporter = window.V3InvoiceDiffReporter || {
+  reports: [],
+
+  analyze(){
+    const legacyInvoices = window.invoices || [];
+    const v3Invoices = window.AppStore?.get?.('v3_invoices') || [];
+
+    const firstLegacy = legacyInvoices[0] || {};
+    const firstV3 = v3Invoices[0] || {};
+
+    const report = {
+      legacyInvoicesCount: legacyInvoices.length,
+      v3InvoicesCount: v3Invoices.length,
+      invoicesCountMatch: legacyInvoices.length === v3Invoices.length,
+
+      firstInvoiceExistsLegacy: !!legacyInvoices[0],
+      firstInvoiceExistsV3: !!v3Invoices[0],
+
+      firstInvoiceClientMatch:
+        (firstLegacy.clientName || '') === (firstV3.clientName || ''),
+
+      firstInvoiceTotalMatch:
+        Number(firstLegacy.total || 0) === Number(firstV3.total || 0),
+
+      timestamp: new Date().toISOString()
+    };
+
+    this.reports.push(report);
+    window.__LAST_INVOICE_DIFF_REPORT__ = report;
+    return report;
+  }
+};
+
+window.__LAST_INVOICE_DIFF_REPORT__ =
+  window.V3InvoiceDiffReporter.analyze();
+
+window.__V3_INVOICE_DIFF_REPORTER_READY__ = true;
+/* ===== END STAGE122 ===== */
+
+
+/* ===== V3 STAGE123 UNIFIED READINESS DASHBOARD ===== */
+window.V3UnifiedReadinessDashboard = window.V3UnifiedReadinessDashboard || {
+  build(){
+    const product = window.__LAST_BUSINESS_DIFF_REPORT__ || {};
+    const sales = window.__LAST_SALES_DIFF_REPORT__ || {};
+    const invoices = window.__LAST_INVOICE_DIFF_REPORT__ || {};
+    const readiness = window.__V3_CUTOVER_READINESS__ || {};
+
+    const dashboard = {
+      productsReady:
+        product.productsCountMatch === true &&
+        product.firstProductNameMatch === true,
+
+      salesReady:
+        sales.salesCountMatch === true,
+
+      invoicesReady:
+        invoices.invoicesCountMatch === true &&
+        invoices.firstInvoiceTotalMatch === true,
+
+      cutoverScore: readiness.score || 0,
+      generatedAt: new Date().toISOString()
+    };
+
+    window.__V3_UNIFIED_DASHBOARD__ = dashboard;
+    return dashboard;
+  }
+};
+
+window.__V3_UNIFIED_DASHBOARD__ =
+  window.V3UnifiedReadinessDashboard.build();
+
+window.__V3_UNIFIED_DASHBOARD_READY__ = true;
+/* ===== END STAGE123 ===== */
+
+
+/* ===== V3 STAGE124 FINAL PARITY SCORE ENGINE ===== */
+window.V3FinalParityScoreEngine = window.V3FinalParityScoreEngine || {
+  calculate(){
+    const d = window.__V3_UNIFIED_DASHBOARD__ || {};
+
+    let score = 0;
+    if(d.productsReady) score += 34;
+    if(d.salesReady) score += 33;
+    if(d.invoicesReady) score += 33;
+
+    const report = {
+      parityScore: score,
+      readyForPilotCutover: score >= 90,
+      generatedAt: new Date().toISOString()
+    };
+
+    window.__V3_FINAL_PARITY_SCORE__ = report;
+    return report;
+  }
+};
+
+window.__V3_FINAL_PARITY_SCORE__ =
+  window.V3FinalParityScoreEngine.calculate();
+
+window.__V3_FINAL_PARITY_SCORE_READY__ = true;
+/* ===== END STAGE124 ===== */
+
+
+/* ===== V3 STAGE125 PERSISTENT APPSTORE ===== */
+(function(){
+ const KEY='ALFARES_V3_APPSTORE';
+
+ try{
+   const saved=localStorage.getItem(KEY);
+   if(saved && window.AppStore && Object.keys(window.AppStore.state||{}).length===0){
+      window.AppStore.state = JSON.parse(saved);
+   }
+ }catch(e){}
+
+ if(window.AppStore && !window.AppStore.__persistentPatched__){
+   const oldSet=window.AppStore.set.bind(window.AppStore);
+   window.AppStore.set=function(k,v){
+      const r=oldSet(k,v);
+      try{
+        localStorage.setItem(KEY, JSON.stringify(this.state));
+      }catch(e){}
+      return r;
+   };
+   window.AppStore.__persistentPatched__=true;
+ }
+
+ window.__V3_PERSISTENT_APPSTORE_READY__=true;
+})();
+/* ===== END STAGE125 ===== */
+
+
+/* ===== REAL STAGE125 PERSISTENT APPSTORE ===== */
+(function(){
+  const KEY='ALFARES_V3_APPSTORE';
+
+  if(window.AppStore){
+    try{
+      const saved = localStorage.getItem(KEY);
+      if(saved){
+        window.AppStore.state = JSON.parse(saved) || {};
+      }
+    }catch(e){}
+
+    const oldSet = window.AppStore.set;
+    window.AppStore.set = function(k,v){
+      const r = oldSet.call(this,k,v);
+      try{
+        localStorage.setItem(KEY, JSON.stringify(this.state||{}));
+      }catch(e){}
+      return r;
+    };
+  }
+
+  window.__V3_REAL_PERSISTENCE_READY__ = true;
+})();
+/* ===== END REAL STAGE125 ===== */
+
+
+/* ===== V3 STAGE126 RUNTIME VERIFICATION BUILD ===== */
+window.__V3_RUNTIME_REPORT__ = function(){
+ const report={
+  products:(window.AppStore?.get?.('v3_products')||[]).length,
+  sales:(window.AppStore?.get?.('v3_sales')||[]).length,
+  invoices:(window.AppStore?.get?.('v3_invoices')||[]).length,
+  persistenceReady:!!window.__V3_REAL_PERSISTENCE_READY__,
+  migrationReady:!!window.RealMigrationEntry,
+  generatedAt:new Date().toISOString()
+ };
+ console.log('V3_RUNTIME_REPORT',report);
+ return report;
+};
+setTimeout(()=>{try{window.__V3_RUNTIME_REPORT__();}catch(e){console.error(e)}},1000);
+window.__V3_RUNTIME_VERIFICATION_READY__=true;
+/* ===== END STAGE126 ===== */
+
+</script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -108,6 +1088,15 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
     .print-show-span { display: inline !important; }
 }
 </style>
+
+<script>
+window.RealMigrationEntry = window.RealMigrationEntry || {
+  migrateProduct(payload){ window.__lastV3ProductPayload = payload; },
+  migrateSale(payload){ window.__lastV3SalePayload = payload; },
+  migrateInvoice(payload){ window.__lastV3InvoicePayload = payload; }
+};
+</script>
+
 </head>
 <body>
 
@@ -451,6 +1440,7 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
             <div class="form-group"><label>الكمية</label><input type="number" id="prod-stock" value="10" min="0"></div>
             <div class="form-group"><label>صورة <small>(يتم ضغطها تلقائياً)</small></label><input type="file" id="prod-image" accept="image/*" style="padding: 8px;"></div>
             <button onclick="saveProduct()" id="save-prod-btn">💾 حفظ القطعة</button>
+            <button onclick="resetAllStock()" style="background-color:#dc2626;margin-top:10px;">🔄 تصفير كميات المخزن</button>
             <button onclick="cancelEditProduct()" id="cancel-edit-btn" style="display:none; background-color: #64748b; margin-top: 10px;">❌ إلغاء التعديل</button>
         </div>
         
@@ -739,7 +1729,10 @@ async function saveLocalData(syncCloud = true) {
         });
 
         if (syncCloud && navigator.onLine && !isSyncing && !isApplyingCloudUpdate) {
-            await pushToCloud();
+            // مزامنة بالخلفية دون انتظارها لتسريع الحفظ
+            setTimeout(() => {
+                pushToCloud().catch(err => console.error(err));
+            }, 0);
         }
     } catch (error) {
         console.error(error);
@@ -1259,7 +2252,7 @@ renderSafeTransactions();
         document.getElementById('ret-currency-group').style.display = isDebt ? 'none' : 'block'; 
     }
 
-    function submitRetailSale() { 
+    function submitRetailSale() {
         const prodId = document.getElementById('ret-product-select').value; 
         const qty = parseInt(document.getElementById('ret-qty').value) || 1; 
         const manualPrice = parseFloat(document.getElementById('ret-price').value) || 0;
@@ -1268,6 +2261,11 @@ renderSafeTransactions();
         const clientName = document.getElementById('ret-client-select').value; 
         const paidAmount = parseFloat(document.getElementById('ret-paid-amount')?.value) || 0;
         const paidCurrency = document.getElementById('ret-paid-currency')?.value || 'usd';  
+        try{
+          if(window.RealMigrationEntry){
+            RealMigrationEntry.migrateSale({productId:prodId,quantity:qty,manualPrice,paymentType:payType,currency:curr,clientName,paidAmount,paidCurrency});
+          }
+        }catch(e){ console.error('V3 migrateSale failed',e); }
         
         let paidUsd = paidAmount;
         if (paidCurrency === 'try' && rates.try > 0) { paidUsd = paidAmount / rates.try; }
@@ -1493,13 +2491,18 @@ document.getElementById('inv-currency').selectedIndex
         window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank'); 
     }
 
-    function saveAndPrintInvoice() { 
+    function saveAndPrintInvoice() {
         if(!Array.isArray(currentInvoiceItems) || currentInvoiceItems.length === 0) return alert("الفاتورة فارغة!"); 
         const clientName = document.getElementById('inv-client-select').value; 
         const total = parseFloat(document.getElementById('invoice-total').innerText);
         const discount = parseFloat(document.getElementById('inv-discount')?.value) || 0;
         const inputValue = parseFloat(document.getElementById('inv-paid-amount').value) || 0; 
         const curr = document.getElementById('inv-currency').value;
+        try{
+          if(window.RealMigrationEntry){
+            RealMigrationEntry.migrateInvoice({clientName,items:currentInvoiceItems,total,discount,paidAmount:inputValue,currency:curr});
+          }
+        }catch(e){ console.error('V3 migrateInvoice failed',e); }
         
         if (discount < 0 || inputValue < 0) return; 
         
@@ -1763,7 +2766,7 @@ addTrackRecord(
             if(!p) return; 
             const img = p.image ? `<img src="${p.image}" class="product-img-thumbnail">` : `<div class="product-img-thumbnail" style="line-height:50px; text-align:center; font-size:10px; background:#e2e8f0;">بدون</div>`; 
             let alertTag = p.stock <= 3 ? `<span style="color:red; font-size:10px; font-weight:bold;">⚠️ منخفض (${p.stock})</span>` : ''; 
-            html += `<div class="data-list-item"><div style="display:flex; align-items:center;">${img}<div style="margin-right:10px;"><strong>${p.name}</strong><br><small>${p.category} | متوفر: ${p.stock} ${alertTag}</small></div></div><div style="text-align: left;"><div style="display:flex; gap:4px; margin-bottom:5px; font-size:11px;"><span style="background:#e2e8f0; padding:2px 4px; border-radius:4px;">ش:${p.cost}$</span><span style="background:#e2e8f0; padding:2px 4px; border-radius:4px;">ج:${p.wholesale}$</span><span style="background:#e2e8f0; padding:2px 4px; border-radius:4px;">م:${p.retail}$</span></div><div><button class="action-btn" style="background:#2563eb; color:white; border:none;" onclick="editProduct('${p.id}')">تعديل</button> <button class="action-btn" style="background:#ef4444; color:white; border:none;" onclick="deleteProduct('${p.id}')">❌</button></div></div></div>`; 
+            html += `<div class="data-list-item"><div style="display:flex; align-items:center;">${img}<div style="margin-right:10px;"><strong>${p.name}</strong><br><small>${p.category} | متوفر: ${p.stock} ${alertTag}</small></div></div><div style="text-align: left;"><div style="display:flex; gap:4px; margin-bottom:5px; font-size:11px;"><span style="background:#e2e8f0; padding:2px 4px; border-radius:4px;">ش:${Number(p.cost||0).toFixed(2)}$</span><span style="background:#e2e8f0; padding:2px 4px; border-radius:4px;">ج:${Number(p.wholesale||0).toFixed(2)}$</span><span style="background:#e2e8f0; padding:2px 4px; border-radius:4px;">م:${Number(p.retail||0).toFixed(2)}$</span></div><div><button class="action-btn" style="background:#2563eb; color:white; border:none;" onclick="editProduct('${p.id}')">تعديل</button> <button class="action-btn" style="background:#ef4444; color:white; border:none;" onclick="deleteProduct('${p.id}')">❌</button></div></div></div>`; 
         }); 
         list.innerHTML = html; 
 
@@ -1843,6 +2846,11 @@ addTrackRecord(
         const cost = parseFloat(document.getElementById('prod-cost').value) || 0; const wholesale = parseFloat(document.getElementById('prod-wholesale').value) || 0;
         const retail = parseFloat(document.getElementById('prod-retail').value) || 0; const stock = parseInt(document.getElementById('prod-stock').value) || 0;
         const imgFile = document.getElementById('prod-image').files[0];
+        try{
+          if(window.RealMigrationEntry){
+            RealMigrationEntry.migrateProduct({name,category,cost,wholesale,retail,stock});
+          }
+        }catch(e){ console.error('V3 migrateProduct failed',e); }
 
         if (!name) return alert("أدخل اسم القطعة");
         if(cost < 0 || wholesale < 0 || retail < 0 || stock < 0) return;
@@ -1874,6 +2882,17 @@ addTrackRecord(
             btn.innerHTML = '💾 حفظ القطعة'; btn.disabled = false;
         }
     }
+
+    
+async function resetAllStock() {
+    if(!confirm('هل تريد تصفير كميات جميع المنتجات؟ سيتم تعديل الكمية فقط.')) return;
+    products.forEach(p => { if(p) p.stock = 0; });
+    products = cleanProductsData(products);
+    await saveLocalData();
+    updateProductsUI();
+    calculateDashboard();
+    alert('تم تصفير كميات المخزن بنجاح');
+}
 
     function editProduct(id) { 
         const prod = products.find(p => p && p.id == id); if(!prod) return; 
@@ -2307,5 +3326,43 @@ renderSafeTransactions();
         <button onclick="closeClientStatement()" style="margin-top:15px; background:#ef4444; color:white; padding:10px 20px; border:none; border-radius:8px;">إغلاق</button>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const costInput = document.getElementById('prod-cost');
+  const wholesaleInput = document.getElementById('prod-wholesale');
+  const retailInput = document.getElementById('prod-retail');
+
+  if (!costInput || !wholesaleInput || !retailInput) return;
+
+  costInput.addEventListener('input', function () {
+      const cost = parseFloat(this.value);
+      if (isNaN(cost)) return;
+
+      wholesaleInput.value = (cost * 1.20).toFixed(2);
+      retailInput.value = (cost * 1.30).toFixed(2);
+  });
+});
+</script>
+
+
+<script>
+(function(){
+const _fmt=v=>{
+ const n=parseFloat(v);
+ return isNaN(n)?v:Number(n).toFixed(2);
+};
+document.addEventListener('DOMContentLoaded',()=>{
+ setTimeout(()=>{
+  document.querySelectorAll('*').forEach(el=>{
+   if(el.children.length===0 && el.textContent){
+     el.textContent=el.textContent.replace(/\$\s*(\d+\.\d{3,})/g,(m,n)=>'$'+Number(n).toFixed(2));
+   }
+  });
+ },1500);
+});
+})();
+</script>
+
 </body>
 </html>
