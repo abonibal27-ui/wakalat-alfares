@@ -6297,5 +6297,284 @@ console.log('📊 القيد المزدوج مفعل، المزامنة التف
 
 </script>
 
+
+
+<!-- ============================================================ -->
+<!-- PATCH-004 R2: Excel import quota-safe direct cloud sync -->
+<script>
+(function(){
+    const PATCH004_R2_VERSION = 'PATCH-004_R2_EXCEL_QUOTA_SAFE_2026-06-27';
+    const LARGE_IMPORT_PENDING_KEY = 'largeExcelImportPendingChangesV1';
+
+    function p4log(msg) {
+        try { console.log('✅ ' + msg); } catch (_) {}
+    }
+
+    function p4Cell(row, names, fallback = '') {
+        for (const name of names) {
+            if (row && row[name] !== undefined && row[name] !== null && String(row[name]).trim() !== '') return row[name];
+        }
+        return fallback;
+    }
+
+    function p4QueueChange(batch, collection, entityId, operation, data) {
+        const now = Date.now();
+        batch.push({
+            id: generateUniqueID(),
+            collection,
+            entityId: String(entityId),
+            operation,
+            data: (data && typeof data === 'object' && !Array.isArray(data)) ? normalizeEntity(data, entityId) : data,
+            timestamp: now,
+            localSeq: now,
+            deviceId: DEVICE_ID,
+            synced: false
+        });
+    }
+
+    function p4AddTrackRecord(batch, prodId, prodName, type, qty, note) {
+        const record = {
+            id: generateUniqueID(),
+            prodId,
+            name: prodName,
+            type,
+            qty,
+            note,
+            date: new Date().toLocaleString('ar-EG'),
+            timestamp: Date.now(),
+            _updatedAt: Date.now(),
+            _deviceId: DEVICE_ID
+        };
+        state.itemTracks.unshift(record);
+        p4QueueChange(batch, 'itemTracks', record.id, 'create', record);
+        return record;
+    }
+
+    function p4CompactLocalSyncQueue() {
+        if (!window.SyncQueue || !Array.isArray(SyncQueue.items)) return;
+        try {
+            const unsynced = SyncQueue.items.filter(c => c && !c.synced);
+            const nonBulk = unsynced.filter(c => !(c.collection === 'products' || c.collection === 'itemTracks'));
+            const productTail = unsynced.filter(c => c.collection === 'products' || c.collection === 'itemTracks').slice(-120);
+            SyncQueue.items = nonBulk.concat(productTail).slice(-600);
+            localStorage.removeItem('syncQueueV2');
+            localStorage.removeItem('syncQueue');
+            try { SyncQueue.save(); } catch (_) {
+                localStorage.removeItem('syncQueueV2');
+                localStorage.removeItem('syncQueue');
+            }
+        } catch (e) {
+            try { localStorage.removeItem('syncQueueV2'); localStorage.removeItem('syncQueue'); } catch (_) {}
+        }
+    }
+
+    if (window.SyncQueue && typeof SyncQueue.save === 'function' && !SyncQueue._patch004R2SavePatched) {
+        const originalSave = SyncQueue.save.bind(SyncQueue);
+        SyncQueue.save = function quotaSafeSave() {
+            try {
+                originalSave();
+            } catch (error) {
+                const msg = String(error && (error.message || error.name) || error).toLowerCase();
+                if (!msg.includes('quota') && !msg.includes('exceeded')) throw error;
+                console.warn('Sync queue exceeded localStorage quota; compacting queue.', error);
+                const unsynced = this.items.filter(c => c && !c.synced);
+                const nonBulk = unsynced.filter(c => !(c.collection === 'products' || c.collection === 'itemTracks'));
+                const productTail = unsynced.filter(c => c.collection === 'products' || c.collection === 'itemTracks').slice(-80);
+                this.items = nonBulk.concat(productTail).slice(-500);
+                try { localStorage.removeItem('syncQueueV2'); localStorage.removeItem('syncQueue'); } catch (_) {}
+                try {
+                    localStorage.setItem('syncQueueV2', JSON.stringify(this.items));
+                    localStorage.setItem('syncQueue', JSON.stringify(this.items));
+                } catch (secondError) {
+                    this.items = nonBulk.slice(-200);
+                    try { localStorage.removeItem('syncQueueV2'); localStorage.removeItem('syncQueue'); } catch (_) {}
+                    try { localStorage.setItem('syncQueueV2', JSON.stringify(this.items)); } catch (_) {}
+                }
+            }
+        };
+        SyncQueue._patch004R2SavePatched = true;
+    }
+
+    async function p4UploadChangesDirect(changes, onProgress) {
+        if (!changes.length) return { uploaded: 0, storedOffline: false };
+        if (!navigator.onLine) {
+            await localforage.setItem(LARGE_IMPORT_PENDING_KEY, changes);
+            return { uploaded: 0, storedOffline: true };
+        }
+
+        const UPLOAD_CHUNK = 120;
+        let uploaded = 0;
+        for (let start = 0; start < changes.length; start += UPLOAD_CHUNK) {
+            const chunk = changes.slice(start, start + UPLOAD_CHUNK);
+            const versioned = await SyncManager.allocateVersions(chunk);
+            const updates = SyncManager.buildUpdates(versioned);
+            await db.ref().update(updates);
+            uploaded += versioned.length;
+            const maxVersion = Math.max(state.syncVersion || 0, ...versioned.map(c => Number(c.syncVersion) || 0));
+            state.syncVersion = maxVersion;
+            if (typeof onProgress === 'function') onProgress(uploaded, changes.length);
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
+        return { uploaded, storedOffline: false };
+    }
+
+    async function p4ProcessExcelRows(rows, onProgress) {
+        const changes = [];
+        const productMap = new Map();
+        state.products.forEach((p) => {
+            if (p && p.name) productMap.set(String(p.name).trim().toLowerCase(), p);
+        });
+
+        let addedCount = 0;
+        let updatedCount = 0;
+        const CHUNK = 80;
+        const nowBase = Date.now();
+
+        for (let start = 0; start < rows.length; start += CHUNK) {
+            const end = Math.min(start + CHUNK, rows.length);
+            for (let i = start; i < end; i++) {
+                const row = rows[i] || {};
+                const rawName = p4Cell(row, ['الاسم', 'اسم القطعة', 'name', 'Name']);
+                if (!rawName) continue;
+                const name = String(rawName).trim();
+                if (!name) continue;
+                const key = name.toLowerCase();
+                const category = String(p4Cell(row, ['القسم', 'الصنف', 'category'], state.categories[0] || 'عام')).trim() || 'عام';
+                const cost = Number(parseFloat(p4Cell(row, ['سعر الشراء', 'تكلفة الشراء', 'cost'], 0)) || 0);
+                const wholesale = Number(parseFloat(p4Cell(row, ['سعر الجملة', 'wholesale'], 0)) || 0);
+                const retail = Number(parseFloat(p4Cell(row, ['سعر المفرق', 'retail'], 0)) || 0);
+                const incomingStock = parseInt(p4Cell(row, ['الكمية', 'الكمية المتوفرة', 'stock'], 0)) || 0;
+
+                const existing = productMap.get(key);
+                if (existing) {
+                    existing.cost = Number(cost.toFixed(2));
+                    existing.wholesale = Number(wholesale.toFixed(2));
+                    existing.retail = Number(retail.toFixed(2));
+                    existing.stock = Number(existing.stock || 0) + incomingStock;
+                    existing.category = category;
+                    existing.version = (existing.version || 0) + 1;
+                    existing._updatedAt = nowBase + i;
+                    existing._deviceId = DEVICE_ID;
+                    p4QueueChange(changes, 'products', existing.id, 'update', existing);
+                    if (incomingStock > 0) p4AddTrackRecord(changes, existing.id, existing.name, 'إضافة كمية', incomingStock, 'تحديث وزيادة كمية عبر إكسيل');
+                    updatedCount++;
+                } else {
+                    const newId = generateUniqueID();
+                    const newProd = {
+                        id: newId,
+                        name,
+                        category,
+                        cost: Number(cost.toFixed(2)),
+                        wholesale: Number(wholesale.toFixed(2)),
+                        retail: Number(retail.toFixed(2)),
+                        stock: incomingStock,
+                        image: '',
+                        version: 1,
+                        _updatedAt: nowBase + i,
+                        _deviceId: DEVICE_ID
+                    };
+                    state.products.unshift(newProd);
+                    productMap.set(key, newProd);
+                    p4QueueChange(changes, 'products', newId, 'create', newProd);
+                    p4AddTrackRecord(changes, newId, name, 'إضافة', incomingStock, 'استيراد قطعة جديدة من إكسيل');
+                    addedCount++;
+                }
+            }
+            if (typeof onProgress === 'function') onProgress(end, rows.length);
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
+
+        if (state.itemTracks.length > 2000) state.itemTracks.length = 2000;
+        return { addedCount, updatedCount, changes };
+    }
+
+    async function p4FlushPendingLargeImport() {
+        const pending = await localforage.getItem(LARGE_IMPORT_PENDING_KEY);
+        if (!pending || !pending.length || !navigator.onLine) return 0;
+        updateSyncStatus('📤 رفع استيراد سابق...');
+        const result = await p4UploadChangesDirect(pending, (done, total) => updateSyncStatus(`📤 رفع ${done} / ${total}`));
+        if (!result.storedOffline) await localforage.removeItem(LARGE_IMPORT_PENDING_KEY);
+        return result.uploaded || 0;
+    }
+
+    const originalPerformDeltaSync = SyncManager.performDeltaSync ? SyncManager.performDeltaSync.bind(SyncManager) : null;
+    if (originalPerformDeltaSync && !SyncManager._patch004R2DeltaPatched) {
+        SyncManager.performDeltaSync = async function patchedPerformDeltaSync() {
+            if (navigator.onLine) {
+                try { await p4FlushPendingLargeImport(); } catch (e) { console.warn('Pending large import upload failed:', e); }
+            }
+            return originalPerformDeltaSync();
+        };
+        SyncManager._patch004R2DeltaPatched = true;
+    }
+
+    window.importFromExcel = function importFromExcelQuotaSafe(event) {
+        if (typeof XLSX === 'undefined') return alert('المكتبة قيد التحميل، يرجى المحاولة بعد قليل');
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        const inputEl = event.target;
+        const reader = new FileReader();
+        showSpinner(true);
+        p4CompactLocalSyncQueue();
+        updateSyncStatus('📥 قراءة ملف الإكسيل...');
+
+        reader.onload = async function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const excelData = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+                if (!excelData.length) {
+                    alert('ملف الإكسيل فارغ أو لا يحتوي على صفوف قابلة للاستيراد.');
+                    return;
+                }
+                if (excelData.length > 5000) {
+                    alert('ملف الإكسيل كبير جدًا. يرجى تقسيمه إلى ملفات أصغر من 5000 صف للحفاظ على استقرار الهاتف.');
+                    return;
+                }
+                if (excelData.length > 2500) {
+                    const ok = confirm(`الملف يحتوي على ${excelData.length} صف. قد يستغرق الاستيراد بعض الوقت. هل تريد المتابعة؟`);
+                    if (!ok) return;
+                }
+
+                updateSyncStatus(`📥 استيراد 0 / ${excelData.length}`);
+                const processed = await p4ProcessExcelRows(excelData, (done, total) => updateSyncStatus(`📥 استيراد ${done} / ${total}`));
+                await saveToLocal();
+                safeUI('updateProductsUI', () => updateProductsUI());
+                safeUI('calculateDashboard', () => calculateDashboard());
+                addAdminLog('استيراد إكسيل', `إضافة ${processed.addedCount} وتحديث ${processed.updatedCount} قطعة عبر إكسيل`);
+
+                let uploadInfo = { uploaded: 0, storedOffline: false };
+                if (processed.changes.length) {
+                    updateSyncStatus(`📤 رفع 0 / ${processed.changes.length}`);
+                    uploadInfo = await p4UploadChangesDirect(processed.changes, (done, total) => updateSyncStatus(`📤 رفع ${done} / ${total}`));
+                }
+                await saveToLocal();
+                updateSyncStatus(uploadInfo.storedOffline ? '⚠️ محفوظ محليًا بانتظار الإنترنت' : '✅ متزامن');
+                const syncLine = uploadInfo.storedOffline
+                    ? '⚠️ تم حفظ التغييرات محليًا وسيتم رفعها عند الاتصال.'
+                    : `📤 تم رفع ${uploadInfo.uploaded} تغيير للسحابة مباشرة بدون امتلاء التخزين.`;
+                alert(`✅ اكتمل الاستيراد بنجاح!\n\n✨ تم إضافة: ${processed.addedCount} قطعة جديدة.\n🔄 تم تحديث: ${processed.updatedCount} قطعة موجودة.\n${syncLine}`);
+            } catch (err) {
+                console.error('Excel import failed:', err);
+                alert('❌ خطأ في قراءة أو استيراد ملف الإكسيل: ' + (err && err.message ? err.message : err));
+            } finally {
+                if (inputEl) inputEl.value = '';
+                showSpinner(false);
+            }
+        };
+        reader.onerror = function() {
+            showSpinner(false);
+            if (inputEl) inputEl.value = '';
+            alert('❌ تعذر قراءة ملف الإكسيل.');
+        };
+        reader.readAsArrayBuffer(file);
+    };
+
+    window.PATCH004_R2 = { version: PATCH004_R2_VERSION, flushPendingLargeImport: p4FlushPendingLargeImport };
+    p4log(PATCH004_R2_VERSION + ' loaded');
+})();
+</script>
+
 </body>
 </html>
