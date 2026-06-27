@@ -289,10 +289,253 @@ button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
     }
 }
 
+/* ===== نتائج بحث المنتج المباشرة بدون مربع Select الأصلي ===== */
+.product-search-results {
+    display: none;
+    position: absolute;
+    z-index: 20;
+    width: 100%;
+    max-height: 320px;
+    overflow-y: auto;
+    background: var(--card-bg);
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    box-shadow: var(--card-shadow);
+    margin-top: 6px;
+}
+.product-search-result-item {
+    padding: 12px;
+    border-bottom: 1px solid #e2e8f0;
+    cursor: pointer;
+    font-weight: 700;
+    line-height: 1.5;
+}
+.product-search-result-item:last-child { border-bottom: none; }
+.product-search-result-item:hover { background: rgba(16, 185, 129, 0.08); }
+.product-search-result-meta {
+    display: block;
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 600;
+    margin-top: 3px;
+}
+body.dark-mode .product-search-results {
+    background: #1e293b;
+    border-color: #334155;
+}
+body.dark-mode .product-search-result-item { border-bottom-color: #334155; }
+body.dark-mode .product-search-result-item:hover { background: rgba(16, 185, 129, 0.12); }
+
+.security-small-note { font-size:12px; color:#64748b; margin-top:6px; line-height:1.7; }
+
+
+/* ===== PATCH-003: فاتورة احترافية Responsive للطباعة و PDF ===== */
+.invoice-preview {
+    background: #ffffff;
+    color: #0f172a;
+    border: 1.5px solid #14532d;
+    border-radius: 18px;
+    padding: 18px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+}
+.inv-grid-header {
+    direction: rtl;
+    display: grid;
+    grid-template-columns: 165px 1fr 165px;
+    min-height: 118px;
+    border: 2px solid #166534;
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 10px;
+    background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 45%, #ecfdf5 100%);
+}
+.inv-contact-side {
+    border-left: 1px solid #bbf7d0;
+    border-bottom: none;
+    background: linear-gradient(180deg, #14532d 0%, #15803d 100%);
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px 14px;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.35;
+    text-align: right;
+}
+.inv-contact-side div {
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.20);
+}
+.inv-contact-side .contact-icon { color: #facc15; margin-left: 5px; }
+.inv-shop-center {
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 12px 10px;
+    border-left: 1px solid #bbf7d0;
+}
+.inv-shop-title-main {
+    color: #14532d;
+    font-size: 30px;
+    line-height: 1.2;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+}
+.inv-shop-title-deco { color: #d4a017; font-size: 18px; margin: 0 6px; }
+.inv-shop-divider { margin: 4px 0; color: #16a34a; }
+.inv-shop-divider .line { width: 56px; height: 2px; background: linear-gradient(90deg, transparent, #16a34a, transparent); }
+.inv-shop-divider .diamond { color: #d4a017; font-size: 9px; }
+.inv-shop-subtitle {
+    color: #166534;
+    background: #dcfce7;
+    border: 1px solid #86efac;
+    border-radius: 999px;
+    padding: 4px 22px;
+    font-size: 14px;
+    font-weight: 800;
+}
+.inv-logo-side {
+    background: #ffffff;
+    border-right: none;
+    border-top: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 6px;
+}
+.inv-logo-side img {
+    width: 100%;
+    height: 100%;
+    max-width: 150px;
+    max-height: 106px;
+    object-fit: contain;
+    display: block;
+}
+.invoice-preview > div[style*="grid-template-columns: 1fr 1fr"] {
+    border: 1.5px solid #16a34a !important;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #f0fdf4;
+    color: #14532d;
+    margin-bottom: 12px !important;
+}
+.invoice-preview #inv-date-time-box,
+.invoice-preview #inv-id-display {
+    font-weight: 900;
+}
+.invoice-client-row {
+    background: #f8fafc;
+    border: 1px solid #d1fae5;
+    border-radius: 12px;
+    padding: 8px 12px;
+    color: #0f172a;
+}
+.invoice-table {
+    border: 1.5px solid #166534;
+    border-radius: 14px;
+    overflow: hidden;
+    border-collapse: separate;
+    border-spacing: 0;
+    box-shadow: 0 4px 14px rgba(21, 128, 61, 0.08);
+}
+.invoice-table th {
+    background: linear-gradient(180deg, #16a34a 0%, #15803d 100%) !important;
+    color: #ffffff !important;
+    border-color: #15803d !important;
+    padding: 8px 6px;
+    font-size: 12px;
+    font-weight: 900;
+}
+.invoice-table td {
+    border-color: #dcfce7 !important;
+    padding: 7px 5px;
+    font-size: 12px;
+    background: #ffffff;
+}
+.invoice-table tbody tr:nth-child(even) td { background: #f8fafc; }
+.invoice-table td img,
+.invoice-table td .no-image {
+    width: 46px !important;
+    height: 46px !important;
+    border-radius: 10px !important;
+    border: 1px solid #dcfce7;
+}
+.inv-summary-row {
+    grid-template-columns: 110px 160px;
+    border: 1px solid #16a34a;
+    border-radius: 0;
+    overflow: hidden;
+    background: #ffffff;
+    font-size: 14px;
+}
+.inv-summary-row:first-child { border-top-left-radius: 12px; border-top-right-radius: 12px; }
+.inv-summary-row:last-child { border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; }
+.inv-summary-row div:first-child {
+    background: #dcfce7 !important;
+    color: #14532d;
+    border-left: 1px solid #16a34a !important;
+    font-weight: 900;
+}
+#invoice-live-currencies {
+    background: linear-gradient(135deg, #14532d 0%, #166534 100%);
+    border-radius: 14px;
+    padding: 10px;
+    color: #ffffff !important;
+    margin-top: 8px;
+}
+#invoice-live-currencies * { color: #ffffff !important; }
+.invoice-footer-note {
+    margin-top: 12px;
+    text-align: center;
+    color: #166534;
+    font-weight: 800;
+    font-size: 12px;
+    border-top: 1px dashed #86efac;
+    padding-top: 8px;
+}
+
+@media (max-width: 600px) {
+    .invoice-preview { padding: 10px; border-radius: 14px; }
+    .inv-grid-header {
+        grid-template-columns: 1fr;
+        min-height: auto;
+    }
+    .inv-contact-side {
+        order: 3;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        flex-wrap: wrap;
+        border-left: none;
+        padding: 8px;
+        font-size: 10.5px;
+    }
+    .inv-contact-side div { width: auto; min-width: 130px; text-align: center; }
+    .inv-shop-center { order: 2; border-left: none; border-top: 1px solid #bbf7d0; padding: 8px; }
+    .inv-shop-title-main { font-size: 22px; }
+    .inv-shop-subtitle { font-size: 12px; padding: 3px 14px; }
+    .inv-logo-side { order: 1; min-height: 80px; border-top: none; padding: 8px; }
+    .inv-logo-side img { max-width: 130px; max-height: 74px; }
+    .invoice-table th, .invoice-table td { font-size: 9.5px; padding: 4px 2px; }
+    .invoice-table td img, .invoice-table td .no-image { width: 32px !important; height: 32px !important; }
+    .inv-summary-row { grid-template-columns: 78px 112px; font-size: 11px; }
+    #invoice-live-currencies { padding: 8px 5px; }
+}
+
 @media print {
  @page { size: A4; margin: 5mm; } 
     body { background: white; color: black; padding-bottom: 0; margin: 0; }
-    header, .nav-bar, .sidebar-overlay, button, select, label, .hide-on-print, .search-box-container { display: none !important; }
+    header, .nav-bar, .sidebar-overlay, button, select, label, .hide-on-print, .search-box-container, .loading-spinner, #global-spinner, .sync-status, #connection-status, #install-btn, .product-search-results { display: none !important; }
     .container { max-width: 100%; padding: 0; margin: 0; display: block !important; }
     .tab-content { display: none !important; }
     .tab-content.active { display: block !important; }
@@ -301,6 +544,447 @@ button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
     .invoice-table input { display: none !important; }
     .print-show-span { display: inline !important; }
 }
+
+/* ===== PATCH-003 FINAL CLEAN CSS ===== */
+.invoice-meta-row {
+    border: 1.5px solid #16a34a !important;
+    border-radius: 12px !important;
+    overflow: hidden;
+    background: #f0fdf4 !important;
+    color: #14532d !important;
+    margin-bottom: 12px !important;
+}
+body.invoice-printing .loading-spinner,
+body.invoice-printing #global-spinner,
+body.invoice-printing .sync-status,
+body.invoice-printing #connection-status,
+body.invoice-printing .product-search-results { display: none !important; }
+@media print {
+    body.invoice-printing .loading-spinner,
+    body.invoice-printing #global-spinner,
+    body.invoice-printing .sync-status,
+    body.invoice-printing #connection-status,
+    .invoice-footer-note { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .invoice-preview { box-shadow: none !important; page-break-inside: avoid; }
+    .invoice-meta-row, .invoice-client-row, .inv-grid-header, #invoice-live-currencies { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+
+
+
+/* ============================================================
+   PATCH-004 PROFESSIONAL UI / UX OVERHAUL
+   واجهة احترافية موحدة - CSS فقط بدون المساس بمنطق التطبيق
+   ============================================================ */
+:root {
+    --brand-950: #052e16;
+    --brand-900: #064e3b;
+    --brand-800: #065f46;
+    --brand-700: #047857;
+    --brand-600: #059669;
+    --brand-500: #10b981;
+    --brand-100: #d1fae5;
+    --brand-50: #ecfdf5;
+    --gold-500: #d4a017;
+    --ink-900: #0f172a;
+    --ink-800: #1e293b;
+    --ink-700: #334155;
+    --ink-500: #64748b;
+    --ink-300: #cbd5e1;
+    --ink-200: #e2e8f0;
+    --ink-100: #f1f5f9;
+    --surface: #ffffff;
+    --surface-soft: #f8fafc;
+    --surface-green: #f0fdf4;
+    --danger: #dc2626;
+    --danger-soft: #fef2f2;
+    --warning: #f59e0b;
+    --info: #2563eb;
+    --radius-xs: 8px;
+    --radius-sm: 12px;
+    --radius-md: 16px;
+    --radius-lg: 22px;
+    --shadow-sm: 0 4px 14px rgba(15, 23, 42, .07);
+    --shadow-md: 0 14px 34px rgba(15, 23, 42, .10);
+    --shadow-lg: 0 24px 70px rgba(15, 23, 42, .16);
+    --ring: 0 0 0 4px rgba(16, 185, 129, .16);
+    --app-gradient: radial-gradient(circle at top right, rgba(16,185,129,.18), transparent 30%), linear-gradient(135deg, #f8fafc 0%, #eefdf5 45%, #f1f5f9 100%);
+    --primary-color: var(--brand-900);
+    --accent-color: var(--brand-500);
+    --bg-color: #eef4f1;
+    --card-bg: var(--surface);
+    --text-color: var(--ink-800);
+    --card-shadow: var(--shadow-sm);
+}
+
+html { scroll-behavior: smooth; }
+body {
+    background: var(--app-gradient) !important;
+    color: var(--ink-800) !important;
+    min-height: 100vh;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+body.dark-mode {
+    --surface: #101b2d;
+    --surface-soft: #0b1220;
+    --surface-green: #052e16;
+    --card-bg: #111827;
+    --text-color: #e5eef8;
+    --ink-800: #e5eef8;
+    --ink-700: #cbd5e1;
+    --ink-500: #94a3b8;
+    --ink-300: #475569;
+    --ink-200: #334155;
+    --ink-100: #0f172a;
+    --app-gradient: radial-gradient(circle at top right, rgba(16,185,129,.14), transparent 32%), linear-gradient(135deg, #020617 0%, #08111f 55%, #0f172a 100%);
+    background: var(--app-gradient) !important;
+}
+
+/* Layout */
+.container {
+    max-width: 1180px !important;
+    padding: 22px !important;
+    margin: 0 auto !important;
+}
+@media (min-width: 1080px) {
+    body { padding-right: 280px; }
+    .nav-bar {
+        right: 0 !important;
+        width: 280px !important;
+        border-radius: 0 !important;
+        box-shadow: -10px 0 34px rgba(15,23,42,.10) !important;
+    }
+    .sidebar-overlay { display: none !important; }
+    header { border-radius: 0 0 0 24px; }
+}
+@media (max-width: 1079px) {
+    body { padding-right: 0; }
+    .container { padding: 14px !important; }
+}
+
+/* Header */
+header#app-header {
+    background: linear-gradient(135deg, var(--brand-950), var(--brand-800)) !important;
+    box-shadow: 0 12px 32px rgba(5, 46, 22, .18) !important;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+    padding: 14px 18px !important;
+    backdrop-filter: blur(14px);
+}
+header#app-header > div:first-child {
+    font-weight: 900;
+    letter-spacing: .2px;
+    gap: 8px;
+}
+#connection-status,
+.sync-status {
+    background: rgba(255,255,255,.13) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255,255,255,.16);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.15);
+}
+.sync-btn {
+    width: auto !important;
+    border-radius: 999px !important;
+    padding: 7px 12px !important;
+    background: rgba(255,255,255,.14) !important;
+    border: 1px solid rgba(255,255,255,.18) !important;
+    color: #fff !important;
+    box-shadow: none !important;
+}
+.sync-btn:hover { background: rgba(255,255,255,.22) !important; transform: translateY(-1px) !important; }
+
+/* Sidebar */
+.nav-bar {
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+    padding: 18px 14px !important;
+    border-left: 1px solid rgba(15, 23, 42, .06);
+}
+body.dark-mode .nav-bar { background: linear-gradient(180deg, #0f172a 0%, #111827 100%) !important; border-left-color: #1e293b; }
+.nav-bar::before {
+    content: "وكالة الفارس";
+    display: block;
+    margin: 4px 6px 14px;
+    padding: 16px 14px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, var(--brand-900), var(--brand-600));
+    color: white;
+    font-size: 18px;
+    font-weight: 900;
+    text-align: center;
+    box-shadow: 0 12px 30px rgba(5, 150, 105, .22);
+}
+.nav-bar::after {
+    content: "ABONIBAL ERP";
+    display: block;
+    margin: 8px 8px 0;
+    padding: 10px;
+    border-radius: 14px;
+    background: var(--brand-50);
+    color: var(--brand-800);
+    text-align: center;
+    font-weight: 900;
+    font-size: 11px;
+    letter-spacing: 1px;
+}
+body.dark-mode .nav-bar::after { background: rgba(16,185,129,.12); color: #6ee7b7; }
+.nav-item {
+    border-radius: 15px !important;
+    margin-bottom: 6px !important;
+    padding: 11px 12px !important;
+    color: var(--ink-500) !important;
+    transition: background .18s ease, transform .18s ease, color .18s ease, box-shadow .18s ease;
+}
+.nav-item:hover {
+    background: rgba(16,185,129,.08) !important;
+    color: var(--brand-700) !important;
+    transform: translateX(-2px);
+}
+.nav-item.active {
+    background: linear-gradient(135deg, var(--brand-600), var(--brand-800)) !important;
+    color: white !important;
+    box-shadow: 0 10px 22px rgba(5,150,105,.22);
+}
+.nav-item .icon {
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 11px;
+    background: rgba(15,23,42,.06);
+    margin-left: 10px !important;
+}
+.nav-item.active .icon { background: rgba(255,255,255,.18); }
+
+/* Cards */
+.card,
+.db-box,
+.auth-box {
+    background: rgba(255,255,255,.92) !important;
+    border: 1px solid rgba(15,23,42,.06) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: var(--shadow-sm) !important;
+    backdrop-filter: blur(10px);
+}
+body.dark-mode .card,
+body.dark-mode .db-box,
+body.dark-mode .auth-box {
+    background: rgba(17,24,39,.88) !important;
+    border-color: rgba(148,163,184,.12) !important;
+}
+.card:hover,
+.db-box:hover { box-shadow: var(--shadow-md) !important; }
+.card-title {
+    border: 0 !important;
+    padding-bottom: 12px !important;
+    margin-bottom: 18px !important;
+    color: var(--ink-900) !important;
+    font-size: 1.08rem !important;
+    position: relative;
+}
+body.dark-mode .card-title { color: #f8fafc !important; }
+.card-title::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 58px;
+    height: 4px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--brand-600), var(--gold-500));
+}
+
+/* Dashboard */
+.dashboard-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 14px !important;
+}
+#tab-dash > div[style*="grid-template-columns"] {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 14px !important;
+}
+.db-box {
+    text-align: right !important;
+    padding: 18px !important;
+    position: relative;
+    overflow: hidden;
+}
+.db-box::before {
+    content: "";
+    position: absolute;
+    inset: auto auto -35px -35px;
+    width: 92px;
+    height: 92px;
+    border-radius: 999px;
+    background: rgba(16,185,129,.10);
+}
+.db-box h4 { color: var(--ink-500) !important; font-size: 12px !important; }
+.db-box p { color: var(--ink-900) !important; font-size: 22px !important; }
+body.dark-mode .db-box p { color: #f8fafc !important; }
+.db-box.profit {
+    grid-column: span 2 !important;
+    background: linear-gradient(135deg, var(--brand-700), var(--brand-950)) !important;
+    color: white !important;
+    box-shadow: 0 18px 46px rgba(5, 95, 70, .22) !important;
+}
+.db-box.profit p,
+.db-box.profit h4 { color: white !important; }
+@media (max-width: 900px) {
+    .dashboard-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    #tab-dash > div[style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 560px) {
+    .dashboard-grid { grid-template-columns: 1fr !important; }
+    .db-box.profit { grid-column: span 1 !important; grid-template-columns: 1fr !important; }
+}
+
+/* Forms */
+.form-group { margin-bottom: 16px !important; }
+label { color: var(--ink-700) !important; font-weight: 800 !important; }
+body.dark-mode label { color: #cbd5e1 !important; }
+input, select, textarea {
+    background: var(--surface-soft) !important;
+    border: 1px solid rgba(100,116,139,.26) !important;
+    color: var(--ink-800) !important;
+    border-radius: 14px !important;
+    padding: 12px 14px !important;
+    transition: border-color .16s ease, box-shadow .16s ease, background .16s ease;
+}
+body.dark-mode input, body.dark-mode select, body.dark-mode textarea {
+    background: #0b1220 !important;
+    color: #e5eef8 !important;
+    border-color: #334155 !important;
+}
+input:focus, select:focus, textarea:focus {
+    border-color: var(--brand-500) !important;
+    box-shadow: var(--ring) !important;
+    background: #ffffff !important;
+}
+body.dark-mode input:focus, body.dark-mode select:focus, body.dark-mode textarea:focus { background: #0f172a !important; }
+
+/* Buttons */
+button, .action-btn, .page-btn {
+    border-radius: 14px !important;
+    box-shadow: 0 10px 20px rgba(15,23,42,.08);
+    transition: transform .16s ease, box-shadow .16s ease, opacity .16s ease, filter .16s ease !important;
+}
+button:hover, .action-btn:hover, .page-btn:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 16px 28px rgba(15,23,42,.12) !important;
+    opacity: .96 !important;
+}
+button:active, .action-btn:active, .page-btn:active { transform: translateY(0) scale(.99) !important; }
+.action-btn { font-weight: 800 !important; }
+
+/* Lists and data rows */
+.data-list-item,
+#products-list > div,
+#clients-list > div,
+#suppliers-list > div,
+#retail-sales-list > div,
+#expenses-list > div,
+#partners-list > div,
+#capital-list > div,
+#exchange-list > div,
+#invoices-list > div,
+#categories-list > div {
+    border: 1px solid rgba(226,232,240,.9) !important;
+    border-radius: 16px !important;
+    margin-bottom: 10px !important;
+    background: rgba(255,255,255,.76) !important;
+    box-shadow: 0 4px 14px rgba(15,23,42,.04);
+}
+body.dark-mode .data-list-item,
+body.dark-mode #products-list > div,
+body.dark-mode #clients-list > div,
+body.dark-mode #suppliers-list > div,
+body.dark-mode #retail-sales-list > div,
+body.dark-mode #expenses-list > div,
+body.dark-mode #partners-list > div,
+body.dark-mode #capital-list > div,
+body.dark-mode #exchange-list > div,
+body.dark-mode #invoices-list > div,
+body.dark-mode #categories-list > div {
+    background: rgba(15,23,42,.7) !important;
+    border-color: rgba(148,163,184,.14) !important;
+}
+.product-img-thumbnail { border-radius: 14px !important; border: 1px solid var(--ink-200); box-shadow: 0 8px 18px rgba(15,23,42,.08); }
+
+/* Search results */
+.product-search-results {
+    border-radius: 18px !important;
+    box-shadow: var(--shadow-lg) !important;
+    border: 1px solid rgba(16,185,129,.18) !important;
+    overflow: hidden;
+}
+.product-search-result-item { transition: background .15s ease, padding .15s ease; }
+.product-search-result-item:hover { padding-right: 18px !important; }
+
+/* Tables */
+table:not(.invoice-table) {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    overflow: hidden;
+    border-radius: 18px;
+}
+table:not(.invoice-table) th {
+    background: var(--brand-50);
+    color: var(--brand-900);
+    font-weight: 900;
+}
+table:not(.invoice-table) td, table:not(.invoice-table) th {
+    border-color: var(--ink-200);
+}
+
+/* Auth */
+#auth-overlay { background: var(--app-gradient) !important; }
+.auth-box {
+    max-width: 420px !important;
+    padding: 34px !important;
+    border: 1px solid rgba(16,185,129,.16) !important;
+}
+.auth-box h2::after {
+    content: "ABONIBAL ERP";
+    display: block;
+    margin-top: 8px;
+    color: var(--brand-600);
+    font-size: 12px;
+    letter-spacing: 1px;
+}
+
+/* Invoice polish kept print-safe */
+.invoice-preview {
+    border-radius: 22px !important;
+    box-shadow: 0 18px 50px rgba(5, 46, 22, .10) !important;
+}
+.inv-grid-header { box-shadow: inset 0 1px 0 rgba(255,255,255,.7); }
+.invoice-table { box-shadow: 0 12px 28px rgba(21,128,61,.09) !important; }
+.invoice-footer-note { color: var(--brand-800) !important; }
+
+/* Empty-ish text */
+p[style*="text-align:center"] { color: var(--ink-500) !important; }
+
+/* Responsive refinements */
+@media (max-width: 720px) {
+    header#app-header { padding: 10px 8px !important; gap: 8px; flex-wrap: wrap; }
+    header#app-header > div { flex-wrap: wrap; }
+    .card { padding: 16px !important; border-radius: 18px !important; }
+    button { padding: 12px !important; }
+    .sync-btn { font-size: 11px !important; padding: 6px 9px !important; }
+    .card-title { font-size: 1rem !important; }
+}
+
+/* Print must stay clean and fast */
+@media print {
+    body { background: #ffffff !important; padding-right: 0 !important; }
+    .card, .db-box, .invoice-preview { box-shadow: none !important; backdrop-filter: none !important; }
+    .nav-bar::before, .nav-bar::after { display: none !important; }
+}
+
 </style>
 </head>
 <body>
@@ -349,6 +1033,7 @@ button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
     <div class="nav-item" onclick="switchTab('categories', this)"><span class="icon">🗂️</span><span>الأقسام</span></div>
     <div class="nav-item" onclick="switchTab('logs', this)"><span class="icon">📋</span><span>السجل</span></div>
     <div class="nav-item" onclick="switchTab('ledger', this)"><span class="icon">📚</span><span>دفتر الأستاذ</span></div>
+    <div class="nav-item" onclick="switchTab('security', this)"><span class="icon">🔐</span><span>الأمان</span></div>
 </nav> 
 
 <!-- Main Container -->
@@ -457,6 +1142,7 @@ button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
                 <label>ابحث عن قطعة</label>
                 <input type="text" id="ret-search-input" placeholder="اكتب اسم القطعة..." oninput="debouncedFilterRetail()" autocomplete="off">
                 <select id="ret-product-select" size="4" onchange="selectRetailProduct()" style="display: none; height: auto; position: absolute; z-index: 10; width: 100%; box-shadow: var(--card-shadow);"></select>
+                <div id="ret-product-results" class="product-search-results"></div>
             </div> 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                 <div class="form-group"><label>الكمية</label><input type="number" id="ret-qty" value="1" min="1" oninput="calculateRetailTotal()"></div>
@@ -510,6 +1196,7 @@ button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
                 <label>البحث لإضافة قطعة</label>
                 <input type="text" id="inv-search-input" placeholder="اكتب اسم القطعة..." oninput="debouncedFilterInvoice()" autocomplete="off">
                 <select id="inv-product-select" size="4" onchange="addProductToInvoice()" style="display: none; height: auto; position: absolute; z-index: 10; width: 100%; box-shadow: var(--card-shadow);"></select>
+                <div id="inv-product-results" class="product-search-results"></div>
             </div>
             <div class="form-group">
                 <label>الدفعة المستلمة:</label>
@@ -565,7 +1252,7 @@ button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
                     <div style="padding: 6px;">رقم الفاتورة: <span id="inv-id-display" style="color:#ef4444;">00000</span></div>
                 </div> 
 
-                <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px;">العميل: <span id="inv-client-name" style="color:#006400;">عام</span></div> 
+                <div class="invoice-client-row" style="font-size: 14px; font-weight: bold; margin-bottom: 10px;">العميل: <span id="inv-client-name" style="color:#006400;">عام</span></div> 
 
                 <table class="invoice-table">
                     <thead>
@@ -587,6 +1274,7 @@ button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
                     <div class="inv-summary-row"><div style="background:#e2e8f0; padding:6px; border-left:1px solid #000;">الباقي:</div><div style="padding:6px; color:red;"><span id="invoice-remaining">0.00</span> $</div></div>
                 </div> 
                 <div id="invoice-live-currencies" style="text-align:center; font-weight:bold; font-size:14px; margin-bottom:10px; color:#000;"></div>
+                <div class="invoice-footer-note">شكراً لتعاملكم مع وكالة الفارس — نتمنى لكم يوماً موفقاً</div>
             </div>
         </div> 
         <div class="hide-on-print" style="display: flex; gap: 10px; margin-bottom: 10px;">
@@ -624,19 +1312,6 @@ button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
             </div>
         </div>
 
-        <div class="card" style="background-color: #f0fdf4;">
-            <div class="card-title">⚡ إضافة سريعة (مجموعة)</div>
-            <textarea id="bulk-names" rows="4" placeholder="مثال:&#10;كوشوك 17 خلفي = 16.5&#10;تابلو شرش = 4.1" style="margin-bottom:10px;"></textarea>
-            <div class="form-group"><label>القسم</label><select id="bulk-category"></select></div> 
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-                <div class="form-group"><label>الشراء ($)</label><input type="number" id="bulk-cost" step="0.01" value="0" min="0"></div>
-                <div class="form-group"><label>الجملة ($)</label><input type="number" id="bulk-wholesale" step="0.01" value="0" min="0"></div>
-                <div class="form-group"><label>المفرق ($)</label><input type="number" id="bulk-retail" step="0.01" value="0" min="0"></div>
-            </div>
-            <div class="form-group"><label>الكمية الافتراضية</label><input type="number" id="bulk-stock" value="10" min="0"></div>
-            <button onclick="saveBulkProducts()" id="save-bulk-btn" style="background-color: #15803d;">🚀 إضافة القائمة</button>
-        </div>
-
         <div class="card" id="product-form-container">
             <div class="card-title" id="form-product-title">إضافة قطعة واحدة</div>
             <div class="form-group"><label>اسم القطعة</label><input type="text" id="prod-name"></div>
@@ -669,6 +1344,7 @@ button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
                 <label>ابحث عن القطعة لعرض سجلها</label>
                 <input type="text" id="track-search-input" placeholder="اكتب اسم القطعة..." oninput="debouncedFilterTracking()" autocomplete="off">
                 <select id="track-product-select" size="4" onchange="selectTrackingProduct()" style="display: none; height: auto; position: absolute; z-index: 10; width: 100%; box-shadow: var(--card-shadow);"></select>
+                <div id="track-product-results" class="product-search-results"></div>
             </div>
             <div id="tracking-list" style="margin-top: 15px;">
                 <p style="text-align:center; color:#64748b;">الرجاء البحث واختيار قطعة لعرض حركتها.</p>
@@ -825,6 +1501,36 @@ button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
             <div id="trial-balance-display"></div>
         </div>
     </div>
+
+    <!-- Security Tab -->
+    <div id="tab-security" class="tab-content">
+        <div class="card">
+            <div class="card-title">🔐 إعدادات الأمان</div>
+            <div class="form-group">
+                <label>كلمة المرور الحالية</label>
+                <input type="password" id="security-current-pass" autocomplete="current-password" placeholder="أدخل كلمة المرور الحالية">
+            </div>
+            <div class="form-group">
+                <label>كلمة المرور الجديدة</label>
+                <input type="password" id="security-new-pass" autocomplete="new-password" placeholder="أدخل كلمة المرور الجديدة">
+            </div>
+            <div class="form-group">
+                <label>تأكيد كلمة المرور الجديدة</label>
+                <input type="password" id="security-confirm-pass" autocomplete="new-password" placeholder="أعد إدخال كلمة المرور الجديدة">
+            </div>
+            <button onclick="changeAdminPassword()" style="background:var(--info-color);">🔑 تغيير كلمة المرور</button>
+            <button onclick="lockApplication()" style="background:#64748b; margin-top:10px;">🔒 قفل التطبيق</button>
+        </div>
+
+        <div class="card" style="background:#fef2f2; border:1px solid #fecaca;">
+            <div class="card-title" style="color:#991b1b;">🧹 تبييض التطبيق</div>
+            <p style="font-size:13px; color:#7f1d1d; margin-bottom:12px; line-height:1.8; font-weight:700;">
+                هذا الإجراء يمسح كل بيانات التطبيق محلياً ومن السحابة: المنتجات، الفواتير، العملاء، الموردين، الصندوق، السجلات، القيود، طوابير المزامنة، والصور المعلقة. لا يمكن التراجع عنه إلا بوجود نسخة احتياطية.
+            </p>
+            <button onclick="wipeApplication()" style="background:#b91c1c;">🧨 تبييض التطبيق بالكامل</button>
+        </div>
+    </div>
+
 </div>
 
 <!-- Client Statement Modal -->
@@ -963,6 +1669,32 @@ function normalizeStateForLegacyData() {
 
 function safeUI(name, fn) {
     try { fn(); } catch (error) { console.error('UI update failed:', name, error); }
+}
+
+function currencySymbol(value) {
+    const code = currencyCode(value, 'usd');
+    if (code === 'try') return '₺';
+    if (code === 'syp') return 'ل.س';
+    return '$';
+}
+
+function formatCurrencyAmount(amount, currency, sign = '') {
+    const code = currencyCode(currency, 'usd');
+    const n = Number(amount) || 0;
+    const decimals = code === 'usd' ? 2 : 0;
+    return `${sign}${n.toFixed(decimals)} ${currencySymbol(code)}`;
+}
+
+function formatUsdEquivalent(value) {
+    const n = Number(value) || 0;
+    return `يعادل $${n.toFixed(2)}`;
+}
+
+function syncAfterLocalMutation() {
+    saveToLocal();
+    if (navigator.onLine) {
+        SyncManager.performDeltaSync();
+    }
 }
 
 function mergeById(localArr, cloudArr) {
@@ -2060,25 +2792,118 @@ function calculateProfitStats() {
     document.getElementById('profit-year').innerText = yearProfit.toFixed(2) + ' $';
 }
 
+
+function normalizeProductSearchText(value) {
+    return String(value || '')
+        .toLowerCase()
+        .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
+        .replace(/[أإآٱ]/g, 'ا')
+        .replace(/ى/g, 'ي')
+        .replace(/ة/g, 'ه')
+        .replace(/ؤ/g, 'و')
+        .replace(/ئ/g, 'ي')
+        .replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+        .replace(/[۰-۹]/g, d => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+        .replace(/[^\p{L}\p{N}]+/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function findMatchingProductsForSearch(keyword) {
+    const normalizedKeyword = normalizeProductSearchText(keyword);
+    if (!normalizedKeyword) return [];
+
+    const tokens = normalizedKeyword.split(' ').filter(Boolean);
+    const scored = [];
+
+    state.products.forEach(product => {
+        if (!product || !product.name || Number(product.stock || 0) <= 0) return;
+
+        const searchableName = normalizeProductSearchText(product.name);
+        const searchableCategory = normalizeProductSearchText(product.category || '');
+        const searchableCode = normalizeProductSearchText(product.code || product.barcode || '');
+        const fullSearchText = `${searchableName} ${searchableCategory} ${searchableCode}`.trim();
+
+        // مهم: كل الكلمات المكتوبة يجب أن تكون موجودة، حتى لا تظهر كل المنتجات عند كتابة كلمة عامة فقط.
+        const allTokensMatch = tokens.every(token => fullSearchText.includes(token));
+        if (!allTokensMatch) return;
+
+        let score = 0;
+        if (searchableName === normalizedKeyword) score += 1000;
+        if (searchableName.startsWith(normalizedKeyword)) score += 500;
+        if (searchableName.includes(normalizedKeyword)) score += 250;
+        score += Math.max(0, 100 - searchableName.length);
+
+        scored.push({ product, score });
+    });
+
+    return scored
+        .sort((a, b) => b.score - a.score || String(a.product.name).localeCompare(String(b.product.name), 'ar'))
+        .map(item => item.product)
+        .slice(0, 40);
+}
+
 // ============================================================
 // 13. RETAIL SALES
 // ============================================================
-function filterRetailProducts() {
-    const keyword = document.getElementById('ret-search-input').value.trim().toLowerCase();
-    const select = document.getElementById('ret-product-select');
-    if (!keyword) { select.style.display = 'none'; select.value = ''; calculateRetailTotal(); return; }
-    let html = '';
-    let hasResults = false;
-    state.products.forEach(p => {
-        if (p && p.name && p.stock > 0 && (p.name.toLowerCase().includes(keyword) || (p.category && p.category.toLowerCase().includes(keyword)))) {
-            hasResults = true;
-            html += `<option value="${p.id}">${p.name} - السعر: ${p.retail}$ (المتوفر: ${p.stock})</option>`;
-        }
-    });
-    select.innerHTML = html;
-    select.style.display = hasResults ? 'block' : 'none';
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"]|'/g, ch => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[ch]));
 }
-const debouncedFilterRetail = debounce(filterRetailProducts, 250);
+
+function renderProductSearchResults(containerId, products, onSelectFnName) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    if (!products || !products.length) {
+        container.style.display = 'none';
+        container.innerHTML = '';
+        return;
+    }
+
+    container.innerHTML = products.map(p => {
+        const id = escapeHtml(p.id);
+        const name = escapeHtml(p.name || 'بدون اسم');
+        const price = Number(p.retail || 0);
+        const stock = Number(p.stock || 0);
+        return `<div class="product-search-result-item" onclick="${onSelectFnName}('${id}')">${name}<span class="product-search-result-meta">السعر: $${price} - المتوفر: ${stock}</span></div>`;
+    }).join('');
+    container.style.display = 'block';
+}
+
+function hideProductSearchResults(containerId) {
+    const container = document.getElementById(containerId);
+    if (container) {
+        container.innerHTML = '';
+        container.style.display = 'none';
+    }
+}
+
+function filterRetailProducts() {
+    const input = document.getElementById('ret-search-input');
+    const keyword = input.value.trim();
+    const select = document.getElementById('ret-product-select');
+
+    select.innerHTML = '';
+    select.value = '';
+    select.style.display = 'none'; // لا نعرض select الأصلي حتى لا يظهر مربع أبيض أو قائمة كل المنتجات على الهاتف.
+
+    if (!keyword) {
+        hideProductSearchResults('ret-product-results');
+        calculateRetailTotal();
+        return;
+    }
+
+    const results = findMatchingProductsForSearch(keyword);
+    renderProductSearchResults('ret-product-results', results, 'chooseRetailProduct');
+}
+// البحث يجب أن يكون فورياً، لا نؤخره حتى لا يفتح الهاتف قائمة قديمة أو غير مفلترة.
+const debouncedFilterRetail = filterRetailProducts;
+
+function chooseRetailProduct(productId) {
+    const select = document.getElementById('ret-product-select');
+    select.value = String(productId || '');
+    select.innerHTML = `<option value="${escapeHtml(productId)}" selected></option>`;
+    selectRetailProduct();
+}
 
 function selectRetailProduct() {
     const select = document.getElementById('ret-product-select');
@@ -2086,7 +2911,7 @@ function selectRetailProduct() {
     if (prod) {
         document.getElementById('ret-search-input').value = prod.name;
         document.getElementById('ret-price').value = prod.retail || 0;
-        select.style.display = 'none';
+        hideProductSearchResults('ret-product-results');
         calculateRetailTotal();
     }
 }
@@ -2296,21 +3121,31 @@ function updateInvoiceClientName() {
 }
 
 function filterInvoiceProducts() {
-    const keyword = document.getElementById('inv-search-input').value.trim().toLowerCase();
+    const input = document.getElementById('inv-search-input');
+    const keyword = input.value.trim();
     const select = document.getElementById('inv-product-select');
-    if (!keyword) { select.style.display = 'none'; return; }
-    let html = '';
-    let hasResults = false;
-    state.products.forEach(p => {
-        if (p && p.name && p.stock > 0 && (p.name.toLowerCase().includes(keyword) || (p.category && p.category.toLowerCase().includes(keyword)))) {
-            hasResults = true;
-            html += `<option value="${p.id}">${p.name} - السعر: ${p.retail}$</option>`;
-        }
-    });
-    select.innerHTML = html;
-    select.style.display = hasResults ? 'block' : 'none';
+
+    select.innerHTML = '';
+    select.value = '';
+    select.style.display = 'none'; // لا نعرض select الأصلي حتى لا يظهر مربع أبيض أو قائمة كل المنتجات على الهاتف.
+
+    if (!keyword) {
+        hideProductSearchResults('inv-product-results');
+        return;
+    }
+
+    const results = findMatchingProductsForSearch(keyword);
+    renderProductSearchResults('inv-product-results', results, 'chooseInvoiceProduct');
 }
-const debouncedFilterInvoice = debounce(filterInvoiceProducts, 250);
+// البحث يجب أن يكون فورياً، لا نؤخره حتى لا يفتح الهاتف قائمة قديمة أو غير مفلترة.
+const debouncedFilterInvoice = filterInvoiceProducts;
+
+function chooseInvoiceProduct(productId) {
+    const select = document.getElementById('inv-product-select');
+    select.value = String(productId || '');
+    select.innerHTML = `<option value="${escapeHtml(productId)}" selected></option>`;
+    addProductToInvoice();
+}
 
 function addProductToInvoice() {
     const prodId = document.getElementById('inv-product-select').value;
@@ -2330,9 +3165,21 @@ function addProductToInvoice() {
         });
         document.getElementById('inv-search-input').value = '';
         document.getElementById('inv-product-select').style.display = 'none';
+        hideProductSearchResults('inv-product-results');
         renderInvoiceTable();
     }
 }
+
+
+// إخفاء نتائج البحث عند الضغط خارج مربع البحث حتى لا تبقى قائمة مفتوحة فوق الواجهة.
+document.addEventListener('click', function(event) {
+    const retailBox = document.getElementById('ret-search-input')?.closest('.form-group');
+    const invoiceBox = document.getElementById('inv-search-input')?.closest('.form-group');
+    const trackingBox = document.getElementById('track-search-input')?.closest('.form-group');
+    if (retailBox && !retailBox.contains(event.target)) hideProductSearchResults('ret-product-results');
+    if (invoiceBox && !invoiceBox.contains(event.target)) hideProductSearchResults('inv-product-results');
+    if (trackingBox && !trackingBox.contains(event.target)) hideProductSearchResults('track-product-results');
+});
 
 function updateInvItem(index, field, value) {
     let val = parseFloat(value);
@@ -2397,6 +3244,18 @@ function calculateInvoiceTotal() {
 
     document.getElementById('invoice-paid-display').innerText = paidUsd.toFixed(2) + " $";
     document.getElementById('invoice-remaining').innerText = remaining.toFixed(2);
+
+    const liveCurrencies = document.getElementById('invoice-live-currencies');
+    if (liveCurrencies) {
+        const tryValue = state.rates.try > 0 ? totalUSD * state.rates.try : 0;
+        const sypValue = state.rates.syp > 0 ? totalUSD * state.rates.syp : 0;
+        liveCurrencies.innerHTML = `
+            <div style="display:flex; justify-content:center; gap:10px; align-items:center; direction:rtl; flex-wrap:wrap;">
+                <span style="background:rgba(255,255,255,.14); padding:6px 10px; border-radius:999px;">💵 الدولار: $ ${totalUSD.toFixed(2)}</span>
+                <span style="background:rgba(255,255,255,.14); padding:6px 10px; border-radius:999px;">💶 التركي: ₺ ${tryValue.toFixed(1)}</span>
+                <span style="background:rgba(255,255,255,.14); padding:6px 10px; border-radius:999px;">💷 السوري: ل.س ${Math.round(sypValue)}</span>
+            </div>`;
+    }
 }
 
 function shareWhatsApp() {
@@ -3506,16 +4365,55 @@ function saveExpense() {
     alert("✅ تم تسجيل المصروف");
 }
 
+function deleteExpense(id) {
+    const idx = state.expenses.findIndex(e => e && String(e.id) === String(id));
+    if (idx === -1) return;
+    const exp = state.expenses[idx];
+    if (!confirm(`هل تريد حذف المصروف "${exp.title || ''}"؟ سيتم إرجاع المبلغ إلى الصندوق.`)) return;
+
+    const currency = currencyCode(exp.currency, 'usd');
+    const amount = Number(exp.amount || 0);
+    const usdEq = Number(exp.usdEquivalent || 0);
+
+    try {
+        if (amount > 0) updateSafe(currency, amount, 'add', `استرجاع حذف مصروف: ${exp.title || ''}`);
+    } catch (err) {
+        return alert('تعذر حذف المصروف: ' + err.message);
+    }
+
+    if (usdEq > 0) {
+        recordLedgerEntry(`صندوق ${currencyLabel(currency)}`, usdEq, 0, 'حذف مصروف', exp.title || '');
+        recordLedgerEntry('مصاريف تشغيلية', 0, usdEq, 'حذف مصروف', exp.title || '');
+    }
+
+    state.expenses.splice(idx, 1);
+    trackChange('expenses', exp.id, 'delete', { id: exp.id });
+    syncAfterLocalMutation();
+    updateExpensesUI();
+    calculateDashboard();
+    addAdminLog('حذف مصروف', `تم حذف المصروف: ${exp.title || ''}`);
+}
+
 function updateExpensesUI() {
     const list = document.getElementById('expenses-list');
     if (!list) return;
     let html = '';
+    state.expenses = forceArray(state.expenses).map(e => ({
+        ...e,
+        id: e && e.id ? e.id : generateUniqueID(),
+        title: e && e.title ? e.title : 'مصروف',
+        currency: currencyCode(e && e.currency, 'usd'),
+        amount: Number(e && e.amount) || 0,
+        usdEquivalent: Number(e && e.usdEquivalent) || 0,
+        date: e && e.date ? e.date : ''
+    }));
     state.expenses.forEach(e => {
         if(!e) return;
         html += `<div class="data-list-item">
-            <div><strong>${e.title}</strong><br><small>${e.date}</small></div>
-            <div style="text-align:left;">
-                <span style="color:var(--danger-color); font-weight:bold;">-${e.amount} ${currencyLabel(e.currency)}</span>
+            <div><strong>${e.title || 'مصروف'}</strong><br><small>${e.date || ''}</small><br><small style="color:#64748b;">${formatUsdEquivalent(e.usdEquivalent)}</small></div>
+            <div style="text-align:left; display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+                <span style="color:var(--danger-color); font-weight:bold;" dir="ltr">${formatCurrencyAmount(e.amount, e.currency, '-')}</span>
+                <button class="action-btn" style="background:var(--danger-color); color:white; border:none;" onclick="deleteExpense('${e.id}')">❌ حذف</button>
             </div>
         </div>`;
     });
@@ -3614,6 +4512,64 @@ function saveCapitalRecord() {
     alert("✅ تم إضافة رأس المال");
 }
 
+function deletePartnerWithdrawal(id) {
+    const idx = state.partnerWithdrawals.findIndex(w => w && String(w.id) === String(id));
+    if (idx === -1) return;
+    const w = state.partnerWithdrawals[idx];
+    if (!confirm(`هل تريد حذف سحب الشريك ${w.partner || ''}؟ سيتم إرجاع المبلغ إلى الصندوق.`)) return;
+
+    const currency = currencyCode(w.currency, 'usd');
+    const amount = Number(w.amount || 0);
+    const usdEq = Number(w.usdEquivalent || 0);
+
+    try {
+        if (amount > 0) updateSafe(currency, amount, 'add', `استرجاع حذف سحب شريك (${w.partner || ''})`);
+    } catch (err) {
+        return alert('تعذر حذف السحب: ' + err.message);
+    }
+
+    if (usdEq > 0) {
+        recordLedgerEntry(`صندوق ${currencyLabel(currency)}`, usdEq, 0, 'حذف سحب شريك', w.note || '');
+        recordLedgerEntry(`جاري الشريك ${w.partner || ''}`, 0, usdEq, 'حذف سحب شريك', w.note || '');
+    }
+
+    state.partnerWithdrawals.splice(idx, 1);
+    trackChange('partnerWithdrawals', w.id, 'delete', { id: w.id });
+    syncAfterLocalMutation();
+    updatePartnersUI();
+    calculateDashboard();
+    addAdminLog('حذف سحب شريك', `تم حذف سحب ${w.partner || ''}`);
+}
+
+function deleteCapitalRecord(id) {
+    const idx = state.capitalRecords.findIndex(c => c && String(c.id) === String(id));
+    if (idx === -1) return;
+    const c = state.capitalRecords[idx];
+    if (!confirm(`هل تريد حذف إضافة رأس المال من ${c.partner || ''}؟ سيتم خصم المبلغ من الصندوق.`)) return;
+
+    const currency = currencyCode(c.currency, 'usd');
+    const amount = Number(c.amount || 0);
+    const usdEq = Number(c.usdEquivalent || 0);
+
+    try {
+        if (amount > 0) updateSafe(currency, amount, 'subtract', `حذف رأس مال (${c.partner || ''})`);
+    } catch (err) {
+        return alert('تعذر حذف رأس المال: ' + err.message);
+    }
+
+    if (usdEq > 0) {
+        recordLedgerEntry(`رأس مال ${c.partner || ''}`, usdEq, 0, 'حذف رأس مال', c.note || '');
+        recordLedgerEntry(`صندوق ${currencyLabel(currency)}`, 0, usdEq, 'حذف رأس مال', c.note || '');
+    }
+
+    state.capitalRecords.splice(idx, 1);
+    trackChange('capitalRecords', c.id, 'delete', { id: c.id });
+    syncAfterLocalMutation();
+    updatePartnersUI();
+    calculateDashboard();
+    addAdminLog('حذف رأس مال', `تم حذف رأس مال ${c.partner || ''}`);
+}
+
 function updatePartnersUI() {
     const list = document.getElementById('partners-list');
     const capList = document.getElementById('capital-list');
@@ -3623,14 +4579,27 @@ function updatePartnersUI() {
 
     if (list) {
         let html = '';
+        state.partnerWithdrawals = forceArray(state.partnerWithdrawals).map(w => ({
+            ...w,
+            id: w && w.id ? w.id : generateUniqueID(),
+            partner: w && w.partner ? w.partner : '',
+            note: w && w.note ? w.note : '',
+            amount: Number(w && w.amount) || 0,
+            currency: currencyCode(w && w.currency, 'usd'),
+            usdEquivalent: Number(w && w.usdEquivalent) || 0,
+            date: w && w.date ? w.date : ''
+        }));
         state.partnerWithdrawals.forEach(w => {
             if(!w) return;
             if (w.partner === 'أبو نيبال') totalAbuNibal += (w.usdEquivalent || 0);
             if (w.partner === 'أبو عبدو') totalAbuAbdo += (w.usdEquivalent || 0);
             
             html += `<div class="data-list-item">
-                <div><strong>سحب ${w.partner}</strong> <span style="font-size:11px;color:#64748b;">${w.note}</span><br><small>${w.date}</small></div>
-                <div style="text-align:left; color:var(--danger-color); font-weight:bold;">-${w.amount} ${currencyLabel(w.currency)}</div>
+                <div><strong>سحب ${w.partner || ''}</strong> <span style="font-size:11px;color:#64748b;">${w.note || ''}</span><br><small>${w.date || ''}</small><br><small style="color:#64748b;">${formatUsdEquivalent(w.usdEquivalent)}</small></div>
+                <div style="text-align:left; display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+                    <span style="color:var(--danger-color); font-weight:bold;" dir="ltr">${formatCurrencyAmount(w.amount, w.currency, '-')}</span>
+                    <button class="action-btn" style="background:var(--danger-color); color:white; border:none;" onclick="deletePartnerWithdrawal('${w.id}')">❌ حذف</button>
+                </div>
             </div>`;
         });
         list.innerHTML = html || '<p style="text-align:center; color:#64748b;">لا توجد سحوبات</p>';
@@ -3638,11 +4607,24 @@ function updatePartnersUI() {
 
     if (capList) {
         let html = '';
+        state.capitalRecords = forceArray(state.capitalRecords).map(c => ({
+            ...c,
+            id: c && c.id ? c.id : generateUniqueID(),
+            partner: c && c.partner ? c.partner : '',
+            note: c && c.note ? c.note : '',
+            amount: Number(c && c.amount) || 0,
+            currency: currencyCode(c && c.currency, 'usd'),
+            usdEquivalent: Number(c && c.usdEquivalent) || 0,
+            date: c && c.date ? c.date : ''
+        }));
         state.capitalRecords.forEach(c => {
             if(!c) return;
             html += `<div class="data-list-item">
-                <div><strong>إضافة ${c.partner}</strong> <span style="font-size:11px;color:#64748b;">${c.note}</span><br><small>${c.date}</small></div>
-                <div style="text-align:left; color:var(--success-color); font-weight:bold;">+${c.amount} ${currencyLabel(c.currency)}</div>
+                <div><strong>إضافة ${c.partner || ''}</strong> <span style="font-size:11px;color:#64748b;">${c.note || ''}</span><br><small>${c.date || ''}</small><br><small style="color:#64748b;">${formatUsdEquivalent(c.usdEquivalent)}</small></div>
+                <div style="text-align:left; display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+                    <span style="color:var(--success-color); font-weight:bold;" dir="ltr">${formatCurrencyAmount(c.amount, c.currency, '+')}</span>
+                    <button class="action-btn" style="background:var(--danger-color); color:white; border:none;" onclick="deleteCapitalRecord('${c.id}')">❌ حذف</button>
+                </div>
             </div>`;
         });
         capList.innerHTML = html || '<p style="text-align:center; color:#64748b;">لا يوجد سجل رأس مال</p>';
@@ -3712,6 +4694,27 @@ function submitExchange() {
     alert("✅ تمت عملية التصريف بنجاح");
 }
 
+function deleteExchange(id) {
+    const idx = state.exchanges.findIndex(ex => ex && String(ex.id) === String(id));
+    if (idx === -1) return;
+    const ex = normalizeExchangeRecord(state.exchanges[idx]);
+    if (!confirm('هل تريد حذف عملية التصريف؟ سيتم عكس أثرها على الصناديق.')) return;
+
+    try {
+        updateSafe(ex.fromCurr, Number(ex.fromAmount || 0), 'add', `استرجاع حذف تصريف`);
+        updateSafe(ex.toCurr, Number(ex.toAmount || 0), 'subtract', `حذف تصريف`);
+    } catch (err) {
+        return alert('تعذر حذف عملية التصريف: ' + err.message);
+    }
+
+    state.exchanges.splice(idx, 1);
+    trackChange('exchanges', ex.id, 'delete', { id: ex.id });
+    syncAfterLocalMutation();
+    updateExchangeUI();
+    calculateDashboard();
+    addAdminLog('حذف تصريف', `تم حذف تصريف ${ex.fromAmount} ${ex.fromCurr} إلى ${ex.toAmount} ${ex.toCurr}`);
+}
+
 function updateExchangeUI() {
     const list = document.getElementById('exchange-list');
     if (!list) return;
@@ -3721,9 +4724,12 @@ function updateExchangeUI() {
         if(!ex) return;
         html += `<div class="data-list-item">
             <div><strong>تصريف</strong><br><small>${ex.date || ''}</small></div>
-            <div style="text-align:left;" dir="ltr">
-                <span style="color:var(--danger-color);">- ${Number(ex.fromAmount || 0)} ${currencyLabel(ex.fromCurr)}</span> ➔ 
-                <span style="color:var(--success-color);">+ ${Number(ex.toAmount || 0)} ${currencyLabel(ex.toCurr)}</span>
+            <div style="text-align:left; display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+                <div dir="ltr">
+                    <span style="color:var(--danger-color);">${formatCurrencyAmount(ex.fromAmount, ex.fromCurr, '-')}</span> ➔ 
+                    <span style="color:var(--success-color);">${formatCurrencyAmount(ex.toAmount, ex.toCurr, '+')}</span>
+                </div>
+                <button class="action-btn" style="background:var(--danger-color); color:white; border:none;" onclick="deleteExchange('${ex.id}')">❌ حذف</button>
             </div>
         </div>`;
     });
@@ -3755,31 +4761,45 @@ function updateShortagesUI() {
 }
 
 function filterTrackingProducts() {
-    const keyword = document.getElementById('track-search-input').value.trim().toLowerCase();
+    const input = document.getElementById('track-search-input');
+    const keyword = input.value.trim();
     const select = document.getElementById('track-product-select');
-    if (!keyword) { select.style.display = 'none'; return; }
-    let html = '';
-    let hasResults = false;
-    state.products.forEach(p => {
-        if (p && p.name && (p.name.toLowerCase().includes(keyword) || (p.category && p.category.toLowerCase().includes(keyword)))) {
-            hasResults = true;
-            html += `<option value="${p.id}">${p.name} (متوفر: ${p.stock})</option>`;
-        }
-    });
-    select.innerHTML = html;
-    select.style.display = hasResults ? 'block' : 'none';
+    if (select) {
+        select.innerHTML = '';
+        select.value = '';
+        select.style.display = 'none';
+    }
+
+    if (!keyword) {
+        hideProductSearchResults('track-product-results');
+        const list = document.getElementById('tracking-list');
+        if (list) list.innerHTML = '<p style="text-align:center; color:#64748b;">الرجاء البحث واختيار قطعة لعرض حركتها.</p>';
+        return;
+    }
+
+    const results = findMatchingProductsForSearch(keyword);
+    renderProductSearchResults('track-product-results', results, 'chooseTrackingProduct');
 }
-const debouncedFilterTracking = debounce(filterTrackingProducts, 250);
+const debouncedFilterTracking = filterTrackingProducts;
+
+function chooseTrackingProduct(productId) {
+    const prod = state.products.find(p => p && String(p.id) === String(productId));
+    if (!prod) return;
+    const select = document.getElementById('track-product-select');
+    if (select) {
+        select.value = String(productId || '');
+        select.innerHTML = `<option value="${escapeHtml(productId)}" selected></option>`;
+        select.style.display = 'none';
+    }
+    document.getElementById('track-search-input').value = prod.name;
+    hideProductSearchResults('track-product-results');
+    renderTrackingList(prod.id);
+}
 
 function selectTrackingProduct() {
     const select = document.getElementById('track-product-select');
-    const prodId = select.value;
-    const prod = state.products.find(p => p && String(p.id) === String(prodId));
-    if (prod) {
-        document.getElementById('track-search-input').value = prod.name;
-        select.style.display = 'none';
-        renderTrackingList(prod.id);
-    }
+    const prodId = select ? select.value : '';
+    if (prodId) chooseTrackingProduct(prodId);
 }
 
 function renderTrackingList(prodId) {
@@ -4122,6 +5142,506 @@ async function initApp() {
     console.log(`🔄 إصدار المزامنة: ${state.syncVersion}`);
 }
 
+
+// ============================================================
+// PATCH-002 — Engineering Stabilization & Hardening
+// ============================================================
+const PATCH_002_VERSION = 'PATCH-002_SYNC_DATA_SECURITY_HARDENING';
+const ADMIN_HASH_STORAGE_KEY = 'abonibalAdminPassHash';
+const COLLECTION_CLEAR_MARKS_KEY = 'collectionClearMarksV2';
+const DEFAULT_ADMIN_PASS_HASH_PATCH002 = ADMIN_PASS_HASH;
+const PATCH002_ARRAY_COLLECTIONS = [
+    'products', 'clients', 'invoices', 'retailSales', 'expenses', 'suppliers',
+    'partnerWithdrawals', 'capitalRecords', 'exchanges', 'itemTracks',
+    'safeTransactions', 'ledgerEntries', 'adminLogs'
+];
+
+function getAdminPassHash() {
+    return localStorage.getItem(ADMIN_HASH_STORAGE_KEY) ||
+        (state.security && state.security.adminPassHash) ||
+        DEFAULT_ADMIN_PASS_HASH_PATCH002;
+}
+
+function setAdminPassHash(hash, options = {}) {
+    const cleanHash = String(hash || '').trim();
+    if (!cleanHash) return;
+    localStorage.setItem(ADMIN_HASH_STORAGE_KEY, cleanHash);
+    state.security = {
+        ...(state.security || {}),
+        adminPassHash: cleanHash,
+        changedAt: options.changedAt || Date.now(),
+        changedBy: options.changedBy || DEVICE_ID,
+        _updatedAt: options.changedAt || Date.now(),
+        _deviceId: DEVICE_ID
+    };
+}
+
+async function loginApp() {
+    const pass = document.getElementById('admin-password').value;
+    const hashedInput = await sha256(pass);
+    if (hashedInput === getAdminPassHash()) {
+        document.getElementById('auth-overlay').style.display = 'none';
+        document.getElementById('main-container').style.display = 'block';
+        document.getElementById('app-header').style.display = 'flex';
+        initApp();
+    } else {
+        document.getElementById('auth-error').style.display = 'block';
+    }
+}
+
+function lockApplication() {
+    document.getElementById('auth-overlay').style.display = 'flex';
+    document.getElementById('main-container').style.display = 'none';
+    document.getElementById('app-header').style.display = 'none';
+    const pass = document.getElementById('admin-password');
+    if (pass) pass.value = '';
+}
+
+async function changeAdminPassword() {
+    const current = document.getElementById('security-current-pass')?.value || '';
+    const next = document.getElementById('security-new-pass')?.value || '';
+    const confirmNext = document.getElementById('security-confirm-pass')?.value || '';
+    if (!current || !next || !confirmNext) return alert('يرجى تعبئة جميع حقول كلمة المرور.');
+    if (next.length < 4) return alert('كلمة المرور الجديدة قصيرة جداً. يجب أن تكون 4 أحرف/أرقام على الأقل.');
+    const currentHash = await sha256(current);
+    if (currentHash !== getAdminPassHash()) return alert('كلمة المرور الحالية غير صحيحة.');
+    if (next !== confirmNext) return alert('كلمة المرور الجديدة وتأكيدها غير متطابقين.');
+    const newHash = await sha256(next);
+    const changedAt = Date.now();
+    setAdminPassHash(newHash, { changedAt });
+    trackChange('system', 'security', 'update', state.security);
+    await saveToLocal();
+    if (navigator.onLine) await SyncManager.performDeltaSync();
+    ['security-current-pass', 'security-new-pass', 'security-confirm-pass'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    addAdminLog('تغيير كلمة المرور', 'تم تغيير كلمة مرور الدخول بنجاح');
+    alert('✅ تم تغيير كلمة المرور ومزامنتها.');
+}
+
+const __patch002OriginalNormalize = normalizeStateForLegacyData;
+normalizeStateForLegacyData = function() {
+    __patch002OriginalNormalize();
+    state.security = state.security || { adminPassHash: getAdminPassHash(), changedAt: 0, _updatedAt: 0 };
+    if (state.security.adminPassHash) localStorage.setItem(ADMIN_HASH_STORAGE_KEY, state.security.adminPassHash);
+    PATCH002_ARRAY_COLLECTIONS.forEach(collection => { state[collection] = forceArray(state[collection]); });
+};
+
+function getCollectionClearMarks() {
+    return safeJsonParse(localStorage.getItem(COLLECTION_CLEAR_MARKS_KEY), {});
+}
+
+function setCollectionClearMark(collection, versionOrTime) {
+    const marks = getCollectionClearMarks();
+    marks[collection] = Math.max(Number(marks[collection] || 0), Number(versionOrTime || Date.now()));
+    localStorage.setItem(COLLECTION_CLEAR_MARKS_KEY, JSON.stringify(marks));
+}
+
+function trackCollectionClear(collection, reason = '') {
+    const now = Date.now();
+    setCollectionClearMark(collection, now);
+    SyncQueue.add({
+        id: generateUniqueID(),
+        collection,
+        entityId: '__all__',
+        operation: 'clearCollection',
+        data: { collection, reason, clearedAt: now, _updatedAt: now, _deviceId: DEVICE_ID },
+        timestamp: now,
+        localSeq: now,
+        deviceId: DEVICE_ID,
+        synced: false
+    });
+    scheduleDeltaSync();
+}
+
+function applyCloudDeletionState(syncData) {
+    if (!syncData) return;
+    const deletions = syncData.deletions || {};
+    Object.keys(deletions).forEach(collection => {
+        if (!Array.isArray(state[collection])) return;
+        const ids = new Set(Object.keys(deletions[collection] || {}).map(String));
+        if (ids.size) state[collection] = state[collection].filter(item => item && !ids.has(String(item.id)));
+    });
+
+    const clears = syncData.collectionClears || {};
+    Object.keys(clears).forEach(collection => {
+        if (!Array.isArray(state[collection])) return;
+        const clearInfo = clears[collection];
+        const clearStamp = (typeof clearInfo === 'number')
+            ? clearInfo
+            : Number((clearInfo && (clearInfo.syncVersion || clearInfo.clearedAt || clearInfo.timestamp)) || 0);
+        const marks = getCollectionClearMarks();
+        if (clearStamp && clearStamp >= Number(marks[collection] || 0)) {
+            state[collection] = [];
+            setCollectionClearMark(collection, clearStamp || Date.now());
+        }
+    });
+}
+
+const __patch002OriginalBuildUpdates = SyncManager.buildUpdates;
+SyncManager.buildUpdates = function(changes) {
+    const updates = {};
+    changes.forEach(change => {
+        updates[`sync/changes/${change.id}`] = change;
+
+        if (change.operation === 'clearCollection') {
+            updates[change.collection] = null;
+            updates[`sync/collectionClears/${change.collection}`] = {
+                collection: change.collection,
+                reason: change.data && change.data.reason || '',
+                clearedAt: change.timestamp,
+                syncVersion: change.syncVersion,
+                deviceId: change.deviceId
+            };
+            return;
+        }
+
+        if (change.collection === 'system' && change.entityId === 'security') {
+            updates['system/security'] = change.data || {};
+            return;
+        }
+
+        const path = rootPathForChange(change);
+        if (path) updates[path] = change.operation === 'delete' ? null : change.data;
+        if (change.operation === 'delete') {
+            updates[`sync/deletions/${change.collection}/${change.entityId}`] = {
+                id: change.entityId,
+                collection: change.collection,
+                deletedAt: change.timestamp,
+                syncVersion: change.syncVersion,
+                deviceId: change.deviceId
+            };
+        }
+    });
+    updates['sync/lastSyncTime'] = Date.now();
+    return updates;
+};
+
+const __patch002OriginalApplyRemoteChange = SyncManager.applyRemoteChange;
+SyncManager.applyRemoteChange = async function(change) {
+    if (!change || !change.id || !change.collection) return false;
+
+    if (change.operation === 'clearCollection') {
+        if (change.deviceId === DEVICE_ID) {
+            state.syncVersion = Math.max(Number(state.syncVersion) || 0, Number(change.syncVersion) || 0);
+            return false;
+        }
+        if (Array.isArray(state[change.collection])) {
+            state[change.collection] = [];
+            setCollectionClearMark(change.collection, change.syncVersion || change.timestamp || Date.now());
+            state.syncVersion = Math.max(Number(state.syncVersion) || 0, Number(change.syncVersion) || 0);
+            state.lastSyncTime = Date.now();
+            await saveToLocal();
+            return true;
+        }
+        return false;
+    }
+
+    if (change.collection === 'system' && change.entityId === 'security') {
+        if (change.deviceId !== DEVICE_ID && change.data && change.data.adminPassHash) {
+            const incomingTime = Number(change.data._updatedAt || change.data.changedAt || change.timestamp || 0);
+            const localTime = Number((state.security && (state.security._updatedAt || state.security.changedAt)) || 0);
+            if (incomingTime >= localTime) setAdminPassHash(change.data.adminPassHash, { changedAt: incomingTime, changedBy: change.deviceId });
+            state.syncVersion = Math.max(Number(state.syncVersion) || 0, Number(change.syncVersion) || 0);
+            await saveToLocal();
+            return true;
+        }
+        state.syncVersion = Math.max(Number(state.syncVersion) || 0, Number(change.syncVersion) || 0);
+        return false;
+    }
+
+    return __patch002OriginalApplyRemoteChange(change);
+};
+
+SyncManager.finalizeSync = async function () {
+    const access = await ensureFirebaseAccess();
+    if (!access.ok) throw new Error('تعذر الوصول إلى Firebase: ' + access.error);
+    const now = Date.now();
+    state.lastSyncTime = now;
+    const localVersion = Number(state.syncVersion) || 0;
+    await db.ref('sync/lastSyncVersion').transaction(current => Math.max(Number(current) || 0, localVersion));
+    await db.ref().update({
+        'sync/lastSyncTime': now,
+        'lastSyncTime': now,
+        'syncVersion': localVersion
+    });
+    if (localVersion && localVersion % 25 === 0) {
+        await db.ref('full_backup').set({ ...buildCloudStateSnapshot(), security: state.security || {}, backupTime: now });
+    }
+    await saveToLocal();
+};
+
+SyncManager.uploadFullStateSnapshot = async function(reason = 'full-state') {
+    if (!navigator.onLine) return { success: false, error: 'لا يوجد اتصال بالإنترنت' };
+    const access = await ensureFirebaseAccess();
+    if (!access.ok) throw new Error('تعذر الوصول إلى Firebase: ' + access.error);
+    const snapshot = buildCloudStateSnapshot();
+    snapshot.system = { ...(snapshot.system || {}), security: state.security || { adminPassHash: getAdminPassHash() } };
+    snapshot.sync = {
+        ...(snapshot.sync || {}),
+        lastSyncVersion: Number(state.syncVersion) || 0,
+        lastSyncTime: Date.now(),
+        fullStateReason: reason
+    };
+    await db.ref().update(snapshot);
+    return { success: true };
+};
+
+async function pullFromCloud() {
+    const btn = document.getElementById('pull-btn-ui');
+    if (btn) { btn.innerText = '⏳ جاري...'; btn.disabled = true; }
+    try {
+        const access = await ensureFirebaseAccess();
+        if (!access.ok) throw new Error('تعذر الوصول إلى Firebase: ' + access.error);
+        const snapshot = await db.ref().once('value');
+        const data = snapshot.val();
+        if (!data) return alert('⚠️ السحابة فارغة.');
+
+        if (data.products) state.products = mergeById(state.products, cleanProductsData(data.products));
+        if (data.categories) state.categories = forceArray(data.categories);
+        if (data.clients) state.clients = mergeById(state.clients, forceArray(data.clients));
+        if (data.suppliers) state.suppliers = mergeById(state.suppliers, forceArray(data.suppliers));
+        if (data.expenses) state.expenses = mergeById(state.expenses, forceArray(data.expenses));
+        if (data.invoices) state.invoices = mergeById(state.invoices, forceArray(data.invoices));
+        if (data.retailSales) state.retailSales = mergeById(state.retailSales, forceArray(data.retailSales));
+        if (data.itemTracks) state.itemTracks = mergeById(state.itemTracks, forceArray(data.itemTracks));
+        if (data.rates) state.rates = data.rates;
+        if (data.safes) state.safes = data.safes;
+        if (data.exchanges) state.exchanges = mergeById(state.exchanges, forceArray(data.exchanges));
+        if (data.partnerWithdrawals) state.partnerWithdrawals = mergeById(state.partnerWithdrawals, forceArray(data.partnerWithdrawals));
+        if (data.capitalRecords) state.capitalRecords = mergeById(state.capitalRecords, forceArray(data.capitalRecords));
+        if (data.ledgerEntries) state.ledgerEntries = mergeById(state.ledgerEntries, forceArray(data.ledgerEntries));
+        if (data.adminLogs) state.adminLogs = mergeById(state.adminLogs, forceArray(data.adminLogs));
+        if (data.safeTransactions) state.safeTransactions = mergeById(state.safeTransactions, forceArray(data.safeTransactions));
+        if (data.invoiceCount) state.invoiceCount = Math.max(Number(state.invoiceCount)||0, Number(data.invoiceCount)||0);
+        if (data.system && data.system.security && data.system.security.adminPassHash) setAdminPassHash(data.system.security.adminPassHash, { changedAt: data.system.security.changedAt || data.system.security._updatedAt || Date.now() });
+        applyCloudDeletionState(data.sync || {});
+        state.syncVersion = Math.max(Number(state.syncVersion)||0, Number(data.syncVersion)||0, Number(data.sync && data.sync.lastSyncVersion)||0);
+        state.lastSyncTime = data.lastSyncTime || Date.now();
+        normalizeStateForLegacyData();
+        await saveToLocal();
+        updateAllUI();
+        alert('✅ تم استرجاع البيانات من السحابة بنجاح!');
+    } catch (error) {
+        console.error(error);
+        alert('❌ حدث خطأ أثناء جلب البيانات.\n' + explainFirebasePermissionError(error));
+    } finally {
+        if (btn) { btn.innerText = '🔽 استرجاع'; btn.disabled = false; }
+    }
+}
+
+async function createEmergencyBackupFile(reason = 'backup') {
+    try {
+        const backup = { ...state, backupReason: reason, backupTime: new Date().toISOString(), patch: PATCH_002_VERSION };
+        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `ABONIBAL_BACKUP_${reason}_${new Date().toISOString().replace(/[:.]/g,'-')}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    } catch (error) {
+        console.warn('Backup file creation failed:', error);
+    }
+}
+
+function buildEmptyStateObject() {
+    return {
+        categories: ['إطارات', 'محركات', 'اكسسوارات'],
+        products: [], expenses: [], clients: [], suppliers: [], retailSales: [], invoices: [], itemTracks: [],
+        partnerWithdrawals: [], exchanges: [], capitalRecords: [], adminLogs: [], safeTransactions: [], ledgerEntries: [],
+        invoiceCount: 150,
+        rates: { try: 0, syp: 0 },
+        safes: { usd: 0, try: 0, syp: 0 },
+        lastSyncTime: Date.now(),
+        syncVersion: 0,
+        security: { adminPassHash: DEFAULT_ADMIN_PASS_HASH_PATCH002, changedAt: Date.now(), _updatedAt: Date.now(), _deviceId: DEVICE_ID }
+    };
+}
+
+function buildEmptyCloudState() {
+    const empty = buildEmptyStateObject();
+    const clearedAt = Date.now();
+    const collectionClears = {};
+    PATCH002_ARRAY_COLLECTIONS.forEach(collection => { collectionClears[collection] = { collection, reason: 'wipeApplication', clearedAt, syncVersion: 0, deviceId: DEVICE_ID }; });
+    return {
+        products: {}, clients: {}, invoices: {}, retailSales: {}, expenses: {}, suppliers: {}, partnerWithdrawals: {}, capitalRecords: {},
+        exchanges: {}, itemTracks: {}, safeTransactions: {}, ledgerEntries: {}, adminLogs: {},
+        categories: empty.categories,
+        rates: empty.rates,
+        safes: empty.safes,
+        invoiceCount: empty.invoiceCount,
+        lastSyncTime: clearedAt,
+        syncVersion: 0,
+        system: { security: empty.security },
+        sync: { changes: {}, deletions: {}, collectionClears, lastSyncVersion: 0, lastSyncTime: clearedAt, resetAt: clearedAt, resetBy: DEVICE_ID },
+        full_backup: null
+    };
+}
+
+async function wipeApplication() {
+    if (!confirm('⚠️ تحذير خطير: سيتم تبييض التطبيق ومسح كل البيانات محلياً ومن السحابة. هل تريد المتابعة؟')) return;
+    if (!confirm('تأكيد نهائي: لا يمكن التراجع إلا إذا كانت لديك نسخة احتياطية. هل أنت متأكد؟')) return;
+    const typed = prompt('للتأكيد اكتب DELETE أو حذف');
+    if (typed !== 'DELETE' && typed !== 'حذف') return alert('تم إلغاء العملية.');
+    if (!navigator.onLine) return alert('يجب وجود اتصال بالإنترنت لتبييض التطبيق حتى تُمسح السحابة أيضاً.');
+
+    showSpinner(true);
+    updateSyncStatus('🧹 جاري تبييض التطبيق...');
+    try {
+        await createEmergencyBackupFile('before_wipe');
+        const access = await ensureFirebaseAccess();
+        if (!access.ok) throw new Error('تعذر الوصول إلى Firebase: ' + access.error);
+        await db.ref().set(buildEmptyCloudState());
+        await localforage.clear();
+        [SYNC_QUEUE_KEY, 'syncQueue', SYNC_PENDING_IMAGES_KEY, COLLECTION_CLEAR_MARKS_KEY, ADMIN_HASH_STORAGE_KEY].forEach(k => localStorage.removeItem(k));
+        Object.assign(state, buildEmptyStateObject());
+        setAdminPassHash(DEFAULT_ADMIN_PASS_HASH_PATCH002, { changedAt: Date.now() });
+        SyncQueue.items = [];
+        SyncQueue.processed.clear();
+        await saveToLocal();
+        updateAllUI();
+        lockApplication();
+        alert('✅ تم تبييض التطبيق بالكامل. كلمة المرور عادت إلى كلمة المرور الافتراضية.');
+    } catch (error) {
+        console.error(error);
+        alert('❌ فشل تبييض التطبيق: ' + explainFirebasePermissionError(error));
+    } finally {
+        showSpinner(false);
+        updateSyncStatus('✅ متزامن');
+    }
+}
+
+const __patch002OriginalClearLogs = clearLogs;
+clearLogs = async function() {
+    if (!confirm('هل أنت متأكد من مسح سجل النظام بالكامل؟')) return;
+    state.adminLogs = [];
+    trackCollectionClear('adminLogs', 'clearLogs');
+    await saveToLocal();
+    renderAdminLogs();
+    if (navigator.onLine) await SyncManager.performDeltaSync();
+    alert('✅ تم مسح سجل النظام ومزامنة المسح');
+};
+
+clearSafeTransactions = async function() {
+    if (!confirm('هل أنت متأكد من مسح سجل حركات الصندوق بالكامل؟')) return;
+    state.safeTransactions = [];
+    trackCollectionClear('safeTransactions', 'clearSafeTransactions');
+    await saveToLocal();
+    renderSafeTransactions();
+    if (navigator.onLine) await SyncManager.performDeltaSync();
+    alert('✅ تم مسح سجل حركات الصندوق ومزامنة المسح');
+};
+
+clearLedger = async function() {
+    if (!confirm('هل أنت متأكد من مسح سجل دفتر الأستاذ العام بالكامل؟')) return;
+    state.ledgerEntries = [];
+    trackCollectionClear('ledgerEntries', 'clearLedger');
+    await saveToLocal();
+    renderLedgerEntries();
+    if (navigator.onLine) await SyncManager.performDeltaSync();
+    alert('✅ تم مسح دفتر الأستاذ ومزامنة المسح');
+};
+
+const __patch002OriginalSaveCategory = saveCategory;
+saveCategory = function() {
+    const before = JSON.stringify(state.categories || []);
+    __patch002OriginalSaveCategory();
+    if (before !== JSON.stringify(state.categories || [])) {
+        trackChange('categories', 'categories', 'update', state.categories);
+        if (navigator.onLine) SyncManager.performDeltaSync();
+    }
+};
+
+const __patch002OriginalDeleteCategory = deleteCategory;
+deleteCategory = function(catName) {
+    const before = JSON.stringify(state.categories || []);
+    __patch002OriginalDeleteCategory(catName);
+    if (before !== JSON.stringify(state.categories || [])) {
+        trackChange('categories', 'categories', 'update', state.categories);
+        if (navigator.onLine) SyncManager.performDeltaSync();
+    }
+};
+
+async function compressImageForUpload(fileOrBlob) {
+    try {
+        let source = fileOrBlob;
+        const name = String(fileOrBlob.name || '').toLowerCase();
+        const type = String(fileOrBlob.type || '').toLowerCase();
+        if ((name.endsWith('.heic') || name.endsWith('.heif') || type.includes('heic') || type.includes('heif')) && typeof heic2any !== 'undefined') {
+            source = await heic2any({ blob: fileOrBlob, toType: 'image/jpeg', quality: 0.82 });
+        }
+        const bitmap = await createImageBitmap(source);
+        const maxSide = 1280;
+        const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+        canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        return await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.78));
+    } catch (error) {
+        console.warn('Image compression fallback:', error);
+        return fileOrBlob;
+    }
+}
+
+const __patch002OriginalUploadImageToCloudinary = uploadImageToCloudinary;
+uploadImageToCloudinary = async function(imageFile) {
+    const optimized = await compressImageForUpload(imageFile);
+    return __patch002OriginalUploadImageToCloudinary(optimized || imageFile);
+};
+
+function normalizeImportedState(imported) {
+    const clean = buildEmptyStateObject();
+    if (!imported || typeof imported !== 'object') throw new Error('INVALID_BACKUP');
+    PATCH002_ARRAY_COLLECTIONS.forEach(collection => { clean[collection] = forceArray(imported[collection]); });
+    clean.categories = forceArray(imported.categories).length ? forceArray(imported.categories) : clean.categories;
+    clean.rates = { try: Number(imported.rates && imported.rates.try) || 0, syp: Number(imported.rates && imported.rates.syp) || 0 };
+    clean.safes = { usd: Number(imported.safes && imported.safes.usd) || 0, try: Number(imported.safes && imported.safes.try) || 0, syp: Number(imported.safes && imported.safes.syp) || 0 };
+    clean.invoiceCount = Math.max(150, Number(imported.invoiceCount) || 150);
+    clean.syncVersion = Number(imported.syncVersion) || 0;
+    clean.lastSyncTime = Number(imported.lastSyncTime) || Date.now();
+    clean.security = imported.security && imported.security.adminPassHash ? imported.security : { adminPassHash: getAdminPassHash(), changedAt: Date.now(), _updatedAt: Date.now(), _deviceId: DEVICE_ID };
+    return clean;
+}
+
+importBackup = function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            await createEmergencyBackupFile('before_import');
+            const importedState = normalizeImportedState(JSON.parse(e.target.result));
+            Object.assign(state, importedState);
+            setAdminPassHash(state.security.adminPassHash, { changedAt: state.security.changedAt || Date.now() });
+            normalizeStateForLegacyData();
+            await saveToLocal();
+            updateAllUI();
+            if (navigator.onLine && confirm('هل تريد رفع النسخة المستعادة إلى السحابة الآن؟')) {
+                await SyncManager.uploadFullStateSnapshot('importBackup');
+            }
+            alert('✅ تمت استعادة النسخة الاحتياطية بنجاح!');
+            addAdminLog('استعادة نسخة', 'تمت استعادة البيانات من ملف احتياطي بعد التحقق منها');
+        } catch (err) {
+            console.error(err);
+            alert('❌ فشل في قراءة أو التحقق من ملف النسخة الاحتياطية');
+        } finally {
+            event.target.value = '';
+        }
+    };
+    reader.readAsText(file);
+};
+
+const __patch002OriginalUpdateAllUI = updateAllUI;
+updateAllUI = function() {
+    normalizeStateForLegacyData();
+    applyCloudDeletionState({ collectionClears: getCollectionClearMarks() });
+    __patch002OriginalUpdateAllUI();
+};
+
+console.log('✅ PATCH-002 hardening layer loaded');
+
 // ============================================================
 // جاهزية DOM
 // ============================================================
@@ -4159,5 +5679,623 @@ window.addEventListener('unhandledrejection', (e) => { console.error('Promise Er
 console.log('✅ وكالة الفارس - النظام المحاسبي المتكامل جاهز!');
 console.log('📊 القيد المزدوج مفعل، المزامنة التفاضلية مفعلة.');
 </script>
+
+
+<script>
+// ============================================================
+// PATCH-002 R2 — Password persistence + non-blocking Excel import
+// ============================================================
+(function(){
+    const PATCH002_R2_VERSION = 'PATCH-002_R2_PASSWORD_AND_EXCEL_IMPORT_FIX';
+    const SECURITY_LF_KEY_R2 = 'securitySettings';
+
+    function patchLog(message) { console.log('✅ ' + message); }
+
+    async function persistSecuritySettingsR2() {
+        try {
+            if (!state.security || !state.security.adminPassHash) {
+                state.security = {
+                    adminPassHash: (localStorage.getItem(ADMIN_HASH_STORAGE_KEY) || DEFAULT_ADMIN_PASS_HASH_PATCH002),
+                    changedAt: Date.now(),
+                    _updatedAt: Date.now(),
+                    _deviceId: DEVICE_ID
+                };
+            }
+            localStorage.setItem(ADMIN_HASH_STORAGE_KEY, state.security.adminPassHash);
+            if (window.localforage) await localforage.setItem(SECURITY_LF_KEY_R2, state.security);
+        } catch (error) {
+            console.warn('Security local persistence failed:', error);
+        }
+    }
+
+    async function resolveAdminPassHashR2() {
+        const local = localStorage.getItem(ADMIN_HASH_STORAGE_KEY);
+        if (local) return local;
+
+        try {
+            if (window.localforage) {
+                const security = await localforage.getItem(SECURITY_LF_KEY_R2);
+                if (security && security.adminPassHash) {
+                    localStorage.setItem(ADMIN_HASH_STORAGE_KEY, security.adminPassHash);
+                    state.security = { ...(state.security || {}), ...security };
+                    return security.adminPassHash;
+                }
+
+                const other = await localforage.getItem('otherData');
+                if (other && other.security && other.security.adminPassHash) {
+                    localStorage.setItem(ADMIN_HASH_STORAGE_KEY, other.security.adminPassHash);
+                    state.security = { ...(state.security || {}), ...other.security };
+                    await localforage.setItem(SECURITY_LF_KEY_R2, state.security);
+                    return other.security.adminPassHash;
+                }
+            }
+        } catch (error) {
+            console.warn('Security local read failed:', error);
+        }
+
+        // Important for a second device: fetch the synced password before login.
+        // This is intentionally read-only and safe with the current public rules setup.
+        if (navigator.onLine && typeof db !== 'undefined') {
+            try {
+                const snap = await db.ref('system/security').once('value');
+                const cloudSecurity = snap.val();
+                if (cloudSecurity && cloudSecurity.adminPassHash) {
+                    state.security = { ...(state.security || {}), ...cloudSecurity };
+                    localStorage.setItem(ADMIN_HASH_STORAGE_KEY, cloudSecurity.adminPassHash);
+                    if (window.localforage) await localforage.setItem(SECURITY_LF_KEY_R2, state.security);
+                    return cloudSecurity.adminPassHash;
+                }
+            } catch (error) {
+                console.warn('Security cloud read failed:', error);
+            }
+        }
+
+        return DEFAULT_ADMIN_PASS_HASH_PATCH002;
+    }
+
+    // Override login so it accepts the latest locally/cloud-synced password, not only the hard-coded default.
+    window.loginApp = async function loginApp() {
+        const passEl = document.getElementById('admin-password');
+        const errorEl = document.getElementById('auth-error');
+        const pass = passEl ? passEl.value : '';
+        try {
+            if (errorEl) errorEl.style.display = 'none';
+            const hashedInput = await sha256(pass);
+            const activeHash = await resolveAdminPassHashR2();
+            if (hashedInput === activeHash) {
+                document.getElementById('auth-overlay').style.display = 'none';
+                document.getElementById('main-container').style.display = 'block';
+                document.getElementById('app-header').style.display = 'flex';
+                initApp();
+            } else {
+                if (errorEl) {
+                    errorEl.textContent = 'كلمة المرور غير صحيحة';
+                    errorEl.style.display = 'block';
+                }
+            }
+        } catch (error) {
+            console.error('Login failed:', error);
+            if (errorEl) {
+                errorEl.textContent = 'تعذر التحقق من كلمة المرور. تحقق من الاتصال ثم حاول مجددًا.';
+                errorEl.style.display = 'block';
+            }
+        }
+    };
+
+    const __r2OriginalSetAdminPassHash = window.setAdminPassHash || setAdminPassHash;
+    window.setAdminPassHash = function setAdminPassHash(hash, options = {}) {
+        const cleanHash = String(hash || '').trim();
+        if (!cleanHash) return;
+        localStorage.setItem(ADMIN_HASH_STORAGE_KEY, cleanHash);
+        state.security = {
+            ...(state.security || {}),
+            adminPassHash: cleanHash,
+            changedAt: options.changedAt || Date.now(),
+            changedBy: options.changedBy || DEVICE_ID,
+            _updatedAt: options.changedAt || Date.now(),
+            _deviceId: DEVICE_ID
+        };
+        persistSecuritySettingsR2();
+    };
+
+    // Persist security in its own key every time local data is saved.
+    const __r2OriginalSaveToLocal = window.saveToLocal || saveToLocal;
+    window.saveToLocal = async function saveToLocal() {
+        const result = await __r2OriginalSaveToLocal.apply(this, arguments);
+        await persistSecuritySettingsR2();
+        return result;
+    };
+
+    const __r2OriginalLoadFromLocal = window.loadFromLocal || loadFromLocal;
+    window.loadFromLocal = async function loadFromLocal() {
+        const result = await __r2OriginalLoadFromLocal.apply(this, arguments);
+        try {
+            const security = await localforage.getItem(SECURITY_LF_KEY_R2);
+            if (security && security.adminPassHash) {
+                state.security = { ...(state.security || {}), ...security };
+                localStorage.setItem(ADMIN_HASH_STORAGE_KEY, security.adminPassHash);
+            }
+        } catch (error) { console.warn('Security load hook failed:', error); }
+        return result;
+    };
+
+    window.changeAdminPassword = async function changeAdminPassword() {
+        const current = document.getElementById('security-current-pass')?.value || '';
+        const next = document.getElementById('security-new-pass')?.value || '';
+        const confirmNext = document.getElementById('security-confirm-pass')?.value || '';
+        if (!current || !next || !confirmNext) return alert('يرجى تعبئة جميع حقول كلمة المرور.');
+        if (next.length < 4) return alert('كلمة المرور الجديدة قصيرة جداً. يجب أن تكون 4 أحرف/أرقام على الأقل.');
+        const currentHash = await sha256(current);
+        const activeHash = await resolveAdminPassHashR2();
+        if (currentHash !== activeHash) return alert('كلمة المرور الحالية غير صحيحة.');
+        if (next !== confirmNext) return alert('كلمة المرور الجديدة وتأكيدها غير متطابقين.');
+
+        const newHash = await sha256(next);
+        const changedAt = Date.now();
+        window.setAdminPassHash(newHash, { changedAt });
+        await persistSecuritySettingsR2();
+
+        // Write directly to Firebase as well as queueing the change, so a logged-out second device can read it before login.
+        try {
+            if (navigator.onLine && typeof db !== 'undefined') {
+                await db.ref('system/security').set(state.security);
+            }
+        } catch (error) {
+            console.warn('Direct security cloud write failed; queued sync will retry:', error);
+        }
+
+        trackChange('system', 'security', 'update', state.security);
+        await saveToLocal();
+        if (navigator.onLine) await SyncManager.performDeltaSync();
+        ['security-current-pass', 'security-new-pass', 'security-confirm-pass'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+        addAdminLog('تغيير كلمة المرور', 'تم تغيير كلمة مرور الدخول بنجاح');
+        alert('✅ تم تغيير كلمة المرور. الخروج والدخول التالي سيستخدمان الكلمة الجديدة.');
+    };
+
+    function excelCell(row, names, fallback = '') {
+        for (const name of names) {
+            if (row[name] !== undefined && row[name] !== null && String(row[name]).trim() !== '') return row[name];
+        }
+        return fallback;
+    }
+
+    function queueChangeBatchR2(batch, collection, entityId, operation, data) {
+        const now = Date.now();
+        batch.push({
+            id: generateUniqueID(),
+            collection,
+            entityId: String(entityId),
+            operation,
+            data: (data && typeof data === 'object' && !Array.isArray(data)) ? normalizeEntity(data, entityId) : data,
+            timestamp: now,
+            localSeq: now,
+            deviceId: DEVICE_ID,
+            synced: false
+        });
+    }
+
+    function addTrackRecordBatchR2(batch, prodId, prodName, type, qty, note) {
+        const record = {
+            id: generateUniqueID(),
+            prodId,
+            name: prodName,
+            type,
+            qty,
+            note,
+            date: new Date().toLocaleString('ar-EG'),
+            timestamp: Date.now(),
+            _updatedAt: Date.now(),
+            _deviceId: DEVICE_ID
+        };
+        state.itemTracks.unshift(record);
+        queueChangeBatchR2(batch, 'itemTracks', record.id, 'create', record);
+        return record;
+    }
+
+    async function processExcelRowsInChunksR2(rows, onProgress) {
+        const batchChanges = [];
+        const productMap = new Map();
+        state.products.forEach((p, idx) => {
+            if (p && p.name) productMap.set(String(p.name).trim().toLowerCase(), { product: p, index: idx });
+        });
+
+        let addedCount = 0;
+        let updatedCount = 0;
+        const CHUNK = 120;
+        const nowBase = Date.now();
+
+        for (let start = 0; start < rows.length; start += CHUNK) {
+            const end = Math.min(start + CHUNK, rows.length);
+            for (let i = start; i < end; i++) {
+                const row = rows[i] || {};
+                const rawName = excelCell(row, ['الاسم', 'اسم القطعة', 'name', 'Name']);
+                if (!rawName) continue;
+
+                const name = String(rawName).trim();
+                if (!name) continue;
+                const key = name.toLowerCase();
+                const category = String(excelCell(row, ['القسم', 'الصنف', 'category'], state.categories[0] || 'عام')).trim() || 'عام';
+                const cost = Number(parseFloat(excelCell(row, ['سعر الشراء', 'تكلفة الشراء', 'cost'], 0)) || 0);
+                const wholesale = Number(parseFloat(excelCell(row, ['سعر الجملة', 'wholesale'], 0)) || 0);
+                const retail = Number(parseFloat(excelCell(row, ['سعر المفرق', 'retail'], 0)) || 0);
+                const incomingStock = parseInt(excelCell(row, ['الكمية', 'الكمية المتوفرة', 'stock'], 0)) || 0;
+
+                const found = productMap.get(key);
+                if (found) {
+                    const p = found.product;
+                    p.cost = Number(cost.toFixed(2));
+                    p.wholesale = Number(wholesale.toFixed(2));
+                    p.retail = Number(retail.toFixed(2));
+                    p.stock = Number(p.stock || 0) + incomingStock;
+                    p.category = category;
+                    p.version = (p.version || 0) + 1;
+                    p._updatedAt = nowBase + i;
+                    p._deviceId = DEVICE_ID;
+                    queueChangeBatchR2(batchChanges, 'products', p.id, 'update', p);
+                    if (incomingStock > 0) addTrackRecordBatchR2(batchChanges, p.id, p.name, 'إضافة كمية', incomingStock, 'تحديث وزيادة كمية عبر إكسيل');
+                    updatedCount++;
+                } else {
+                    const newId = generateUniqueID();
+                    const newProd = {
+                        id: newId,
+                        name,
+                        category,
+                        cost: Number(cost.toFixed(2)),
+                        wholesale: Number(wholesale.toFixed(2)),
+                        retail: Number(retail.toFixed(2)),
+                        stock: incomingStock,
+                        image: '',
+                        version: 1,
+                        _updatedAt: nowBase + i,
+                        _deviceId: DEVICE_ID
+                    };
+                    state.products.unshift(newProd);
+                    productMap.set(key, { product: newProd, index: 0 });
+                    queueChangeBatchR2(batchChanges, 'products', newId, 'create', newProd);
+                    addTrackRecordBatchR2(batchChanges, newId, name, 'إضافة', incomingStock, 'استيراد قطعة جديدة من إكسيل');
+                    addedCount++;
+                }
+            }
+            if (typeof onProgress === 'function') onProgress(end, rows.length);
+            // yield to the browser so Android WebView does not kill the page
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
+
+        if (state.itemTracks.length > 2000) state.itemTracks.length = 2000;
+        if (batchChanges.length) {
+            SyncQueue.items.push(...batchChanges);
+            SyncQueue.trim();
+            SyncQueue.save();
+        }
+        return { addedCount, updatedCount, queuedCount: batchChanges.length };
+    }
+
+    // Override Excel import to avoid thousands of save/UI/sync calls that freeze Android WebView.
+    window.importFromExcel = function importFromExcel(event) {
+        if (typeof XLSX === 'undefined') return alert('المكتبة قيد التحميل، يرجى المحاولة بعد قليل');
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        const inputEl = event.target;
+        const reader = new FileReader();
+        showSpinner(true);
+        updateSyncStatus('📥 قراءة ملف الإكسيل...');
+
+        reader.onload = async function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const excelData = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+                if (!excelData.length) {
+                    alert('ملف الإكسيل فارغ أو لا يحتوي على صفوف قابلة للاستيراد.');
+                    return;
+                }
+                if (excelData.length > 3000) {
+                    const ok = confirm(`الملف يحتوي على ${excelData.length} صف. قد يستغرق الاستيراد بعض الوقت. هل تريد المتابعة؟`);
+                    if (!ok) return;
+                }
+
+                updateSyncStatus(`📥 استيراد 0 / ${excelData.length}`);
+                const result = await processExcelRowsInChunksR2(excelData, (done, total) => {
+                    updateSyncStatus(`📥 استيراد ${done} / ${total}`);
+                });
+
+                await saveToLocal();
+                safeUI('updateProductsUI', () => updateProductsUI());
+                safeUI('calculateDashboard', () => calculateDashboard());
+                addAdminLog('استيراد إكسيل', `إضافة ${result.addedCount} وتحديث ${result.updatedCount} قطعة عبر إكسيل`);
+                updateSyncStatus('🔄 بانتظار المزامنة');
+                if (navigator.onLine) scheduleDeltaSync(2500);
+                alert(`✅ اكتمل الاستيراد بنجاح!\n\n✨ تم إضافة: ${result.addedCount} قطعة جديدة.\n🔄 تم تحديث: ${result.updatedCount} قطعة موجودة.\n📌 تم تجهيز ${result.queuedCount} تغيير للمزامنة.`);
+            } catch (err) {
+                console.error('Excel import failed:', err);
+                alert('❌ خطأ في قراءة أو استيراد ملف الإكسيل: ' + (err && err.message ? err.message : err));
+            } finally {
+                if (inputEl) inputEl.value = '';
+                showSpinner(false);
+            }
+        };
+        reader.onerror = function() {
+            showSpinner(false);
+            if (inputEl) inputEl.value = '';
+            alert('❌ تعذر قراءة ملف الإكسيل.');
+        };
+        reader.readAsArrayBuffer(file);
+    };
+
+    // expose for troubleshooting
+    window.PATCH002_R2 = { resolveAdminPassHashR2, persistSecuritySettingsR2, version: PATCH002_R2_VERSION };
+    patchLog(PATCH002_R2_VERSION + ' loaded');
+})();
+
+// ============================================================
+// PATCH-003 FINAL CLEANUP — invoice/search/sync clear hardening
+// ============================================================
+(function(){
+    const PATCH003_FINAL_VERSION = 'PATCH-003_FINAL_CLEAN_2026-06-27';
+
+    function patch003NormalizeSearch(value) {
+        if (typeof normalizeProductSearchText === 'function') return normalizeProductSearchText(value);
+        return String(value || '').toLowerCase().trim();
+    }
+
+    function findMatchingProductsForSearchAnyStock(keyword) {
+        const normalizedKeyword = patch003NormalizeSearch(keyword);
+        if (!normalizedKeyword) return [];
+        const tokens = normalizedKeyword.split(' ').filter(Boolean);
+        const scored = [];
+        forceArray(state.products).forEach(product => {
+            if (!product || !product.name) return;
+            const searchableName = patch003NormalizeSearch(product.name);
+            const searchableCategory = patch003NormalizeSearch(product.category || '');
+            const searchableCode = patch003NormalizeSearch(product.code || product.barcode || '');
+            const fullSearchText = `${searchableName} ${searchableCategory} ${searchableCode}`.trim();
+            if (!tokens.every(token => fullSearchText.includes(token))) return;
+            let score = 0;
+            if (searchableName === normalizedKeyword) score += 1000;
+            if (searchableName.startsWith(normalizedKeyword)) score += 500;
+            if (searchableName.includes(normalizedKeyword)) score += 250;
+            score += Math.max(0, 120 - searchableName.length);
+            scored.push({ product, score });
+        });
+        return scored
+            .sort((a, b) => b.score - a.score || String(a.product.name).localeCompare(String(b.product.name), 'ar'))
+            .map(item => item.product)
+            .slice(0, 60);
+    }
+
+    // Tracking is a history view, so it must include out-of-stock products too.
+    window.filterTrackingProducts = function filterTrackingProductsFinal() {
+        const input = document.getElementById('track-search-input');
+        const keyword = input ? input.value.trim() : '';
+        const select = document.getElementById('track-product-select');
+        if (select) {
+            select.innerHTML = '';
+            select.value = '';
+            select.style.display = 'none';
+        }
+        if (!keyword) {
+            hideProductSearchResults('track-product-results');
+            const list = document.getElementById('tracking-list');
+            if (list) list.innerHTML = '<p style="text-align:center; color:#64748b;">الرجاء البحث واختيار قطعة لعرض حركتها.</p>';
+            return;
+        }
+        renderProductSearchResults('track-product-results', findMatchingProductsForSearchAnyStock(keyword), 'chooseTrackingProduct');
+    };
+    window.debouncedFilterTracking = window.filterTrackingProducts;
+
+    function getClearMarksFinal() {
+        const raw = safeJsonParse(localStorage.getItem(COLLECTION_CLEAR_MARKS_KEY), {});
+        const normalized = {};
+        Object.keys(raw || {}).forEach(collection => {
+            const value = raw[collection];
+            if (typeof value === 'number') {
+                normalized[collection] = { syncVersion: 0, clearedAt: value };
+            } else if (value && typeof value === 'object') {
+                normalized[collection] = {
+                    syncVersion: Number(value.syncVersion || 0),
+                    clearedAt: Number(value.clearedAt || value.timestamp || 0)
+                };
+            }
+        });
+        return normalized;
+    }
+
+    function setClearMarkFinal(collection, info) {
+        const marks = getClearMarksFinal();
+        const current = marks[collection] || { syncVersion: 0, clearedAt: 0 };
+        const next = {
+            syncVersion: Math.max(Number(current.syncVersion || 0), Number(info && info.syncVersion || 0)),
+            clearedAt: Math.max(Number(current.clearedAt || 0), Number(info && (info.clearedAt || info.timestamp) || Date.now()))
+        };
+        marks[collection] = next;
+        localStorage.setItem(COLLECTION_CLEAR_MARKS_KEY, JSON.stringify(marks));
+    }
+
+    function isChangeOlderThanClear(change) {
+        if (!change || !change.collection) return false;
+        const mark = getClearMarksFinal()[change.collection];
+        if (!mark) return false;
+        const changeVersion = Number(change.syncVersion || 0);
+        const changeTime = Number(change.timestamp || (change.data && change.data._updatedAt) || 0);
+        if (mark.syncVersion && changeVersion && changeVersion <= mark.syncVersion) return true;
+        if (!changeVersion && mark.clearedAt && changeTime && changeTime <= mark.clearedAt) return true;
+        return false;
+    }
+
+    window.setCollectionClearMark = function setCollectionClearMarkFinal(collection, versionOrInfo) {
+        if (typeof versionOrInfo === 'object') setClearMarkFinal(collection, versionOrInfo);
+        else setClearMarkFinal(collection, { clearedAt: Date.now(), syncVersion: Number(versionOrInfo || 0) });
+    };
+
+    window.trackCollectionClear = function trackCollectionClearFinal(collection, reason = '') {
+        const now = Date.now();
+        setClearMarkFinal(collection, { clearedAt: now, syncVersion: 0 });
+        SyncQueue.add({
+            id: generateUniqueID(),
+            collection,
+            entityId: '__all__',
+            operation: 'clearCollection',
+            data: { collection, reason, clearedAt: now, _updatedAt: now, _deviceId: DEVICE_ID },
+            timestamp: now,
+            localSeq: now,
+            deviceId: DEVICE_ID,
+            synced: false
+        });
+        scheduleDeltaSync();
+    };
+
+    window.applyCloudDeletionState = function applyCloudDeletionStateFinal(syncData) {
+        if (!syncData) return;
+        const deletions = syncData.deletions || {};
+        Object.keys(deletions).forEach(collection => {
+            if (!Array.isArray(state[collection])) return;
+            const entries = deletions[collection] || {};
+            state[collection] = state[collection].filter(item => {
+                if (!item || !item.id) return false;
+                const del = entries[String(item.id)];
+                if (!del) return true;
+                const itemTime = Number(item._updatedAt || item.timestamp || 0);
+                const delTime = Number(del.deletedAt || del.timestamp || 0);
+                const itemVersion = Number(item.syncVersion || 0);
+                const delVersion = Number(del.syncVersion || 0);
+                if (delVersion && itemVersion && itemVersion > delVersion) return true;
+                if (!delVersion && itemTime && delTime && itemTime > delTime) return true;
+                return false;
+            });
+        });
+
+        const clears = syncData.collectionClears || {};
+        Object.keys(clears).forEach(collection => {
+            if (!Array.isArray(state[collection])) return;
+            const clearInfo = clears[collection] || {};
+            const incoming = {
+                syncVersion: Number(clearInfo.syncVersion || 0),
+                clearedAt: Number(clearInfo.clearedAt || clearInfo.timestamp || 0)
+            };
+            const current = getClearMarksFinal()[collection] || { syncVersion: 0, clearedAt: 0 };
+            const isNewer = (incoming.syncVersion && incoming.syncVersion > Number(current.syncVersion || 0)) ||
+                            (!incoming.syncVersion && incoming.clearedAt > Number(current.clearedAt || 0)) ||
+                            (incoming.syncVersion === Number(current.syncVersion || 0) && incoming.clearedAt > Number(current.clearedAt || 0));
+            if (isNewer) {
+                state[collection] = [];
+                setClearMarkFinal(collection, incoming);
+            }
+        });
+    };
+
+    const prevBuildUpdates = SyncManager.buildUpdates;
+    SyncManager.buildUpdates = function buildUpdatesFinal(changes) {
+        const updates = prevBuildUpdates(changes);
+        (changes || []).forEach(change => {
+            if (change && change.operation === 'clearCollection') {
+                updates[`sync/collectionClears/${change.collection}`] = {
+                    collection: change.collection,
+                    reason: change.data && change.data.reason || '',
+                    clearedAt: Number(change.timestamp || Date.now()),
+                    syncVersion: Number(change.syncVersion || 0),
+                    deviceId: change.deviceId || DEVICE_ID
+                };
+            }
+        });
+        return updates;
+    };
+
+    const prevApplyRemoteChange = SyncManager.applyRemoteChange;
+    SyncManager.applyRemoteChange = async function applyRemoteChangeFinal(change) {
+        if (!change || !change.collection) return false;
+        if (change.operation !== 'clearCollection' && isChangeOlderThanClear(change)) {
+            state.syncVersion = Math.max(Number(state.syncVersion) || 0, Number(change.syncVersion) || 0);
+            return false;
+        }
+        if (change.operation === 'clearCollection') {
+            const incoming = { syncVersion: Number(change.syncVersion || 0), clearedAt: Number(change.timestamp || (change.data && change.data.clearedAt) || Date.now()) };
+            const current = getClearMarksFinal()[change.collection] || { syncVersion: 0, clearedAt: 0 };
+            const isNewer = (incoming.syncVersion && incoming.syncVersion > Number(current.syncVersion || 0)) ||
+                            (!incoming.syncVersion && incoming.clearedAt > Number(current.clearedAt || 0)) ||
+                            (incoming.syncVersion === Number(current.syncVersion || 0) && incoming.clearedAt > Number(current.clearedAt || 0));
+            if (isNewer && Array.isArray(state[change.collection])) {
+                state[change.collection] = [];
+                setClearMarkFinal(change.collection, incoming);
+                state.syncVersion = Math.max(Number(state.syncVersion) || 0, Number(change.syncVersion) || 0);
+                state.lastSyncTime = Date.now();
+                await saveToLocal();
+                return true;
+            }
+            state.syncVersion = Math.max(Number(state.syncVersion) || 0, Number(change.syncVersion) || 0);
+            return false;
+        }
+        return prevApplyRemoteChange(change);
+    };
+
+    // A full wipe should not unexpectedly lock the owner out with a different password.
+    const prevBuildEmptyStateObject = window.buildEmptyStateObject || buildEmptyStateObject;
+    window.buildEmptyStateObject = function buildEmptyStateObjectFinal() {
+        const currentHash = getAdminPassHash();
+        const empty = prevBuildEmptyStateObject();
+        empty.security = { adminPassHash: currentHash, changedAt: Date.now(), _updatedAt: Date.now(), _deviceId: DEVICE_ID };
+        return empty;
+    };
+    buildEmptyStateObject = window.buildEmptyStateObject;
+
+    const prevBuildEmptyCloudState = window.buildEmptyCloudState || buildEmptyCloudState;
+    window.buildEmptyCloudState = function buildEmptyCloudStateFinal() {
+        const cloud = prevBuildEmptyCloudState();
+        const currentHash = getAdminPassHash();
+        cloud.system = cloud.system || {};
+        cloud.system.security = { adminPassHash: currentHash, changedAt: Date.now(), _updatedAt: Date.now(), _deviceId: DEVICE_ID };
+        return cloud;
+    };
+    buildEmptyCloudState = window.buildEmptyCloudState;
+
+    const prevWipeApplication = window.wipeApplication || wipeApplication;
+    window.wipeApplication = async function wipeApplicationFinal() {
+        const currentHash = getAdminPassHash();
+        await prevWipeApplication();
+        // If wipe succeeded, restore the same password hash locally. The cloud state was also built with this hash.
+        if (currentHash) setAdminPassHash(currentHash, { changedAt: Date.now(), changedBy: DEVICE_ID });
+    };
+    wipeApplication = window.wipeApplication;
+
+    // Hide transient UI before printing and restore it afterwards.
+    const prevSaveAndPrintInvoice = window.saveAndPrintInvoice || saveAndPrintInvoice;
+    window.saveAndPrintInvoice = async function saveAndPrintInvoiceFinal() {
+        const spinner = document.getElementById('global-spinner');
+        const wasActive = spinner && spinner.classList.contains('active');
+        if (spinner) spinner.classList.remove('active');
+        document.body.classList.add('invoice-printing');
+        try { return await prevSaveAndPrintInvoice(); }
+        finally {
+            setTimeout(() => {
+                document.body.classList.remove('invoice-printing');
+                if (spinner && wasActive) spinner.classList.add('active');
+            }, 1200);
+        }
+    };
+    saveAndPrintInvoice = window.saveAndPrintInvoice;
+
+    // Add explicit classes to invoice structural rows, so the design no longer depends on fragile CSS selectors.
+    function tagInvoiceStructure() {
+        const clientName = document.getElementById('inv-client-name');
+        if (clientName && clientName.parentElement) clientName.parentElement.classList.add('invoice-client-row');
+        const dateBox = document.getElementById('inv-date-time-box');
+        if (dateBox && dateBox.parentElement) dateBox.parentElement.classList.add('invoice-meta-row');
+    }
+    const prevUpdateAllUI = window.updateAllUI || updateAllUI;
+    window.updateAllUI = function updateAllUIFinal() {
+        const result = prevUpdateAllUI.apply(this, arguments);
+        tagInvoiceStructure();
+        return result;
+    };
+    updateAllUI = window.updateAllUI;
+    document.addEventListener('DOMContentLoaded', tagInvoiceStructure);
+    setTimeout(tagInvoiceStructure, 0);
+
+    window.PATCH003_FINAL = { version: PATCH003_FINAL_VERSION };
+    console.log('✅ ' + PATCH003_FINAL_VERSION + ' loaded');
+})();
+
+</script>
+
 </body>
 </html>
