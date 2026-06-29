@@ -1782,13 +1782,153 @@ body.dark-mode .abn-auth-ready-card { background: rgba(16,185,129,.12); color: #
             <input type="email" id="firebase-auth-email" placeholder="البريد الإلكتروني..." autocomplete="username" aria-label="البريد الإلكتروني">
         </div>
         <div class="form-group abn-firebase-auth-field">
-            <input type="password" id="firebase-auth-password" placeholder="كلمة المرور..." autocomplete="current-password" onkeypress="if(event.key === 'Enter') loginApp()" aria-label="كلمة المرور">
+            <input type="password" id="firebase-auth-password" placeholder="كلمة المرور..." autocomplete="current-password" onkeypress="if(event.key === 'Enter') ABN_FORCE_FIREBASE_LOGIN(event)" aria-label="كلمة المرور">
         </div>
         <p class="abn-auth-note">تم إلغاء كلمة مرور البرنامج المحلية. الدخول الآن يتم فقط عبر حساب Firebase المصرح. يتم حفظ البريد فقط، ولا يتم حفظ كلمة المرور.</p>
-        <button onclick="loginApp()">دخول</button>
+        <button id="abn-force-login-btn" type="button" onclick="ABN_FORCE_FIREBASE_LOGIN(event)">دخول</button>
         <p id="auth-error" style="color: red; margin-top: 10px; display: none;">بيانات الدخول غير صحيحة</p>
     </div>
 </div>
+
+<script>
+/* ============================================================
+   PRODUCTION-DATA-006-FORCE-FIREBASE-LOGIN
+   Hard bypass for every legacy local-program-password login path.
+   The login button calls ABN_FORCE_FIREBASE_LOGIN directly, not loginApp.
+   ============================================================ */
+(function(){
+    var BUILD = 'PRODUCTION-DATA-006-FORCE-FIREBASE-LOGIN';
+    var INIT_FLAG = '__ABN_DATA006_APP_INIT_DONE__';
+    function byId(id){ return document.getElementById(id); }
+    function setErr(msg){
+        var el = byId('auth-error');
+        if (el) { el.textContent = msg || 'تعذر تسجيل الدخول.'; el.style.display = 'block'; }
+        else alert(msg || 'تعذر تسجيل الدخول.');
+    }
+    function clearErr(){
+        var el = byId('auth-error');
+        if (el) { el.textContent = ''; el.style.display = 'none'; }
+    }
+    function getEmail(){ var el = byId('firebase-auth-email'); return String((el && el.value) || '').trim().toLowerCase(); }
+    function getPassword(){ var el = byId('firebase-auth-password'); return String((el && el.value) || ''); }
+    function saveEmail(email){ try { if (email) localStorage.setItem('abn_firebase_auth_email', email); } catch(_) {} }
+    function restoreEmail(){
+        try {
+            var el = byId('firebase-auth-email');
+            if (!el || el.value) return;
+            var saved = localStorage.getItem('abn_firebase_auth_email') || localStorage.getItem('abn_firebase_email') || '';
+            if (saved) el.value = saved;
+        } catch(_) {}
+    }
+    function normalizeLoginDom(){
+        try {
+            var adminPass = byId('admin-password');
+            if (adminPass) {
+                var group = adminPass.closest ? adminPass.closest('.form-group') : null;
+                if (group) group.remove(); else adminPass.style.display = 'none';
+            }
+            var note = document.querySelector('.abn-auth-note');
+            if (note) note.textContent = 'تم إلغاء كلمة مرور البرنامج المحلية. الدخول الآن يتم فقط عبر البريد الإلكتروني وكلمة المرور الخاصة بحساب Firebase.';
+            var btn = byId('abn-force-login-btn') || document.querySelector('#auth-overlay button');
+            if (btn) {
+                btn.textContent = 'دخول';
+                btn.type = 'button';
+                btn.onclick = function(e){ return window.ABN_FORCE_FIREBASE_LOGIN(e); };
+            }
+            var pass = byId('firebase-auth-password');
+            if (pass) {
+                pass.onkeypress = function(e){ if ((e && e.key) === 'Enter') return window.ABN_FORCE_FIREBASE_LOGIN(e); };
+            }
+        } catch(_) {}
+    }
+    function showLogin(){
+        var overlay = byId('auth-overlay'), main = byId('main-container'), header = byId('app-header');
+        if (overlay) overlay.style.display = 'flex';
+        if (main) main.style.display = 'none';
+        if (header) header.style.display = 'none';
+        var pass = byId('firebase-auth-password');
+        if (pass) pass.value = '';
+        restoreEmail();
+    }
+    function openApp(){
+        var overlay = byId('auth-overlay'), main = byId('main-container'), header = byId('app-header');
+        if (overlay) overlay.style.display = 'none';
+        if (main) main.style.display = 'block';
+        if (header) header.style.display = 'flex';
+        var pass = byId('firebase-auth-password');
+        if (pass) pass.value = '';
+        if (!window[INIT_FLAG]) {
+            window[INIT_FLAG] = true;
+            window.__ABN_AUTH_ONLY_INIT_DONE__ = true;
+            window.__ABN_R3_INIT_DONE__ = true;
+            try {
+                if (typeof window.initApp === 'function') window.initApp();
+                else if (typeof initApp === 'function') initApp();
+            } catch(err) {
+                console.error('[ABONIBAL DATA006] initApp failed:', err);
+                setErr('تم تسجيل الدخول، لكن فشل تحميل بيانات التطبيق. أعد تحديث الصفحة.');
+            }
+        }
+    }
+    async function forceLogin(e){
+        try { if (e && e.preventDefault) e.preventDefault(); } catch(_) {}
+        try { if (e && e.stopPropagation) e.stopPropagation(); } catch(_) {}
+        clearErr();
+        normalizeLoginDom();
+        try {
+            var email = getEmail();
+            var password = getPassword();
+            if (!email || !password) { setErr('أدخل البريد الإلكتروني وكلمة المرور.'); return false; }
+            if (!window.firebase || !firebase.auth) { setErr('Firebase Auth غير جاهز. افتح النظام من الرابط الرسمي HTTPS.'); return false; }
+            var auth = firebase.auth();
+            try { await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch(_) {}
+            var cred = await auth.signInWithEmailAndPassword(email, password);
+            saveEmail(email);
+            openApp();
+            return !!(cred && cred.user);
+        } catch(error) {
+            console.error('[ABONIBAL DATA006] Firebase login failed:', error);
+            var code = String((error && error.code) || '');
+            if (code.indexOf('auth/invalid-credential') >= 0 || code.indexOf('auth/wrong-password') >= 0 || code.indexOf('auth/user-not-found') >= 0) setErr('البريد الإلكتروني أو كلمة المرور غير صحيحة.');
+            else if (code.indexOf('auth/network-request-failed') >= 0) setErr('تعذر الاتصال بـ Firebase. تحقق من الإنترنت ثم أعد المحاولة.');
+            else if (code.indexOf('auth/too-many-requests') >= 0) setErr('تم إيقاف المحاولات مؤقتًا بسبب كثرة المحاولات. انتظر قليلًا ثم أعد المحاولة.');
+            else setErr((error && error.message) ? error.message : 'فشل تسجيل الدخول.');
+            return false;
+        }
+    }
+    async function forceLogout(){
+        try { if (window.firebase && firebase.auth) await firebase.auth().signOut(); } catch(_) {}
+        window[INIT_FLAG] = false;
+        showLogin();
+    }
+    function ensureAccess(){
+        if (!window.firebase || !firebase.auth || !firebase.auth().currentUser) throw new Error('يجب تسجيل الدخول عبر Firebase أولًا.');
+        var u = firebase.auth().currentUser;
+        return { ok: true, uid: u.uid, email: u.email || null };
+    }
+    window.ABN_FORCE_FIREBASE_LOGIN = forceLogin;
+    window.loginApp = forceLogin;
+    window.lockApplication = forceLogout;
+    window.ensureFirebaseAccess = ensureAccess;
+    try { loginApp = forceLogin; } catch(_) {}
+    try { lockApplication = forceLogout; } catch(_) {}
+    try { ensureFirebaseAccess = ensureAccess; } catch(_) {}
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function(){ normalizeLoginDom(); restoreEmail(); });
+    } else {
+        normalizeLoginDom(); restoreEmail();
+    }
+    window.ABNProductionData006ForceFirebaseLogin = {
+        build: BUILD,
+        health: function(){
+            var user = null;
+            try { user = firebase.auth().currentUser; } catch(_) {}
+            return { build: BUILD, user: !!(user && user.uid), email: user && user.email || null, buttonHandler: 'ABN_FORCE_FIREBASE_LOGIN' };
+        }
+    };
+    console.info('✅ ABONIBAL', BUILD, 'loaded');
+})();
+</script>
 
 <!-- Header -->
 <header id="app-header">
@@ -11898,7 +12038,7 @@ body.dark-mode .abn-sync-watchdog-card .abn-sync-watchdog-note {
             if (!expected) throw new Error('لم يتم العثور على بصمة كلمة مرور البرنامج المحلية.');
             const actual = await sha256Compat(pass);
             if (actual !== expected) {
-                authError('كلمة مرور البرنامج غير صحيحة.');
+                authError('بيانات الدخول غير صحيحة.');
                 return false;
             }
             try {
@@ -12094,7 +12234,7 @@ body.dark-mode .abn-sync-watchdog-card .abn-sync-watchdog-note {
             if (!expected) { setAuthError('لم يتم العثور على كلمة مرور محلية مخصصة. لا يُسمح بالافتراضية في نسخة الإنتاج.'); return false; }
             if (expected.blockedDefault) { setAuthError('كلمة المرور الافتراضية 123456 مرفوضة في الإنتاج. غيّر كلمة المرور من نسخة موثوقة أو فعّل Bootstrap مؤقتًا فقط للترحيل.'); return false; }
             const actual = await sha256RootFixed(pass);
-            if (actual !== expected.hash) { setAuthError('كلمة مرور البرنامج غير صحيحة.'); return false; }
+            if (actual !== expected.hash) { setAuthError('بيانات الدخول غير صحيحة.'); return false; }
             const overlay = $('auth-overlay'), main = $('main-container'), header = $('app-header');
             if (overlay) overlay.style.display = 'none';
             if (main) main.style.display = 'block';
@@ -12374,7 +12514,7 @@ body.dark-mode .abn-sync-watchdog-card .abn-sync-watchdog-note {
                     setAuthError('كلمة مرور السحابة ما زالت افتراضية أو قديمة. افتح النسخة التي تعمل على اللابتوب ثم غيّر كلمة المرور مرة واحدة ليتم نشرها للهاتف.');
                     return false;
                 }
-                setAuthError('كلمة مرور البرنامج غير صحيحة أو أن الهاتف يحمل بصمة محلية قديمة. استخدم النسخة R2 على اللابتوب أولًا لتحديث بصمة السحابة.');
+                setAuthError('بيانات الدخول غير صحيحة.');
                 return false;
             }
 
