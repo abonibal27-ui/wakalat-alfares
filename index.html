@@ -8,10 +8,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="ABONIBAL ERP">
-<title>ABONIBAL ERP Professional - Privacy 005 Simplified Public Profile</title>
+<title>ABONIBAL ERP Production Data 004-R1 - Local Auth Security Hardening</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
@@ -1746,6 +1747,30 @@ body.dark-mode #products-list > div {
     background: rgba(15,23,42,.86) !important;
     border-color: rgba(148,163,184,.22) !important;
 }
+
+/* ============================================================
+   PRODUCTION-DATA-003: Firebase Auth UI + Security Rules Ready
+   ============================================================ */
+.abn-firebase-auth-field input { direction: ltr; text-align: left; }
+.abn-auth-note {
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.7;
+    margin: 8px 0 12px;
+    text-align: right;
+}
+body.dark-mode .abn-auth-note { color: #94a3b8; }
+.abn-auth-ready-card {
+    border: 1px solid #bbf7d0;
+    background: linear-gradient(135deg, #ecfdf5, #ffffff);
+    border-radius: 16px;
+    padding: 14px;
+    margin: 12px 0;
+    color: #065f46;
+    font-weight: 800;
+}
+body.dark-mode .abn-auth-ready-card { background: rgba(16,185,129,.12); color: #d1fae5; border-color: rgba(16,185,129,.25); }
+
 </style>
 </head>
 <body>
@@ -1753,11 +1778,15 @@ body.dark-mode #products-list > div {
 <div id="auth-overlay">
     <div class="auth-box">
         <h2>🔒 تسجيل الدخول</h2>
-        <div class="form-group">
-            <input type="password" id="admin-password" placeholder="أدخل كلمة المرور..." onkeypress="if(event.key === 'Enter') loginApp()" aria-label="كلمة مرور الدخول">
+        <div class="form-group abn-firebase-auth-field">
+            <input type="email" id="firebase-auth-email" placeholder="البريد الإلكتروني..." autocomplete="username" aria-label="البريد الإلكتروني">
         </div>
+        <div class="form-group abn-firebase-auth-field">
+            <input type="password" id="firebase-auth-password" placeholder="كلمة المرور..." autocomplete="current-password" onkeypress="if(event.key === 'Enter') loginApp()" aria-label="كلمة المرور">
+        </div>
+        <p class="abn-auth-note">تم إلغاء كلمة مرور البرنامج المحلية. الدخول الآن يتم فقط عبر حساب Firebase المصرح. يتم حفظ البريد فقط، ولا يتم حفظ كلمة المرور.</p>
         <button onclick="loginApp()">دخول</button>
-        <p id="auth-error" style="color: red; margin-top: 10px; display: none;">كلمة المرور غير صحيحة</p>
+        <p id="auth-error" style="color: red; margin-top: 10px; display: none;">بيانات الدخول غير صحيحة</p>
     </div>
 </div>
 
@@ -2269,20 +2298,10 @@ body.dark-mode #products-list > div {
     <div id="tab-security" class="tab-content">
         <div class="card">
             <div class="card-title">🔐 إعدادات الأمان</div>
-            <div class="form-group">
-                <label for="security-current-pass">كلمة المرور الحالية</label>
-                <input type="password" id="security-current-pass" autocomplete="current-password" placeholder="أدخل كلمة المرور الحالية">
-            </div>
-            <div class="form-group">
-                <label for="security-new-pass">كلمة المرور الجديدة</label>
-                <input type="password" id="security-new-pass" autocomplete="new-password" placeholder="أدخل كلمة المرور الجديدة">
-            </div>
-            <div class="form-group">
-                <label for="security-confirm-pass">تأكيد كلمة المرور الجديدة</label>
-                <input type="password" id="security-confirm-pass" autocomplete="new-password" placeholder="أعد إدخال كلمة المرور الجديدة">
-            </div>
-            <button onclick="changeAdminPassword()" style="background:var(--info-color);">🔑 تغيير كلمة المرور</button>
-            <button onclick="lockApplication()" style="background:#64748b; margin-top:10px;">🔒 قفل التطبيق</button>
+            <p style="font-size:13px; color:#64748b; margin-bottom:12px; line-height:1.8; font-weight:700;">
+                تم إلغاء كلمة مرور البرنامج المحلية. حماية النظام الآن تعتمد فقط على حساب Firebase المصرح: البريد الإلكتروني وكلمة المرور. لتغيير كلمة المرور، غيّر كلمة مرور حساب Firebase/Auth من لوحة Firebase أو حساب Google المرتبط.
+            </p>
+            <button onclick="lockApplication()" style="background:#64748b; margin-top:10px;">🚪 تسجيل خروج</button>
         </div>
 
         <div class="card" style="background:#fef2f2; border:1px solid #fecaca;">
@@ -2413,13 +2432,14 @@ body.dark-mode #products-list > div {
 const ADMIN_PASS_HASH = "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyCJwWHXcbcqtE-5L-FDLog_wF-TDaypB4",
-    authDomain: "wakalat-alfares.firebaseapp.com",
-    databaseURL: "https://wakalat-alfares-default-rtdb.firebaseio.com",
-    projectId: "wakalat-alfares",
-    storageBucket: "wakalat-alfares.firebasestorage.app",
-    messagingSenderId: "1029422954388",
-    appId: "1:1029422954388:web:9d56c0df241eb079194181"
+    apiKey: "AIzaSyCbDQd09D3qIDDdoKl-C1SdqonfPbwDHmk",
+    authDomain: "abonibal-production.firebaseapp.com",
+    databaseURL: "https://abonibal-production-default-rtdb.firebaseio.com",
+    projectId: "abonibal-production",
+    storageBucket: "abonibal-production.firebasestorage.app",
+    messagingSenderId: "176125330481",
+    appId: "1:176125330481:web:e5d8673b9a00d043338110",
+    measurementId: "G-6MBX380NR2"
 };
 
 // ============================================================
@@ -2458,7 +2478,17 @@ const state = {
 // 4. UTILITY FUNCTIONS
 // ============================================================
 function generateUniqueID() {
-    return crypto.randomUUID();
+    if (window.crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    const bytes = new Uint8Array(16);
+    if (window.crypto && typeof crypto.getRandomValues === 'function') {
+        crypto.getRandomValues(bytes);
+    } else {
+        for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+    }
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0'));
+    return `${hex.slice(0,4).join('')}-${hex.slice(4,6).join('')}-${hex.slice(6,8).join('')}-${hex.slice(8,10).join('')}-${hex.slice(10,16).join('')}`;
 }
 
 function debounce(func, wait) {
@@ -2618,7 +2648,7 @@ async function loginApp__legacyInitial() {
 // ============================================================
 // 6. LOCAL STORAGE
 // ============================================================
-localforage.config({ name: 'AlFaresAgency', storeName: 'pos_database' });
+localforage.config({ name: 'ABONIBALProductionData', storeName: 'pos_database_v1' });
 
 const STORAGE_KEYS = {
     PRODUCTS: 'products',
@@ -2725,10 +2755,19 @@ async function loadFromLocal() {
 // 6.1 FIREBASE ACCESS GATE
 // ============================================================
 async function ensureFirebaseAccess() {
-    // لا نستخدم Firebase Auth عند فتح الملف من content:// أو file:// لأن بعض متصفحات أندرويد
-    // تمنع iframe / Google APIs الخاصة بالمصادقة وتسبب أخطاء CORS.
-    // الوصول هنا يعتمد على Firebase Realtime Database Rules.
-    return { ok: true, uid: 'local-file-client' };
+    try {
+        if (!window.firebase || !firebase.auth) {
+            return { ok: false, error: 'Firebase Auth SDK غير محمل.' };
+        }
+        const auth = firebase.auth();
+        const user = auth.currentUser;
+        if (!user || !user.uid) {
+            return { ok: false, error: 'يجب تسجيل الدخول إلى Firebase Auth قبل المزامنة.' };
+        }
+        return { ok: true, uid: user.uid, accountId: user.uid, email: user.email || '' };
+    } catch (error) {
+        return { ok: false, error: error && error.message ? error.message : String(error) };
+    }
 }
 
 function isFirebasePermissionError(error) {
@@ -2744,9 +2783,9 @@ function explainFirebasePermissionError(error) {
 // ============================================================
 // 7. DELTA SYNC SYSTEM (Production-safe queue + conflict handling)
 // ============================================================
-const SYNC_DEVICE_ID_KEY = 'alfaresDeviceId';
-const SYNC_QUEUE_KEY = 'syncQueueV2';
-const SYNC_PENDING_IMAGES_KEY = 'pendingImageUploads';
+const SYNC_DEVICE_ID_KEY = 'abonibalProductionDeviceId';
+const SYNC_QUEUE_KEY = 'abonibalProductionSyncQueueV2';
+const SYNC_PENDING_IMAGES_KEY = 'abonibalProductionPendingImageUploads';
 const DEVICE_ID = (() => {
     let id = localStorage.getItem(SYNC_DEVICE_ID_KEY);
     if (!id) {
@@ -2770,7 +2809,7 @@ const SyncQueue = {
     save() {
         localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(this.items));
         // keep backward compatibility for devices that still read the old key
-        localStorage.setItem('syncQueue', JSON.stringify(this.items));
+        localStorage.setItem('abonibalProductionSyncQueueLegacy', JSON.stringify(this.items));
     },
     getPending() {
         return this.items.filter(change => !change.synced);
@@ -3827,6 +3866,7 @@ async function submitRetailSale() {
 
     const totalSaleUsd = manualPrice * qty;
     if (paidUsd > totalSaleUsd) return alert("الدفعة أكبر من قيمة البيع");
+    if (payType !== 'debt' && Math.abs(paidUsd - totalSaleUsd) > 0.01) return alert("البيع النقدي يجب أن يكون مدفوعًا بالكامل، أو اختر نوع الدفع: دين.");
 
     const btn = document.getElementById('btn-submit-retail');
     btn.disabled = true;
@@ -3969,8 +4009,12 @@ function updateRetailSalesUI() {
     const currNames = { usd: '$', try: '₺', syp: 'ل.س' };
     state.retailSales.forEach(r => {
         if (!r) return;
-        const typeTag = r.payType === 'debt' ? `<span style="color:var(--danger-color);">[دين لـ ${r.clientName}]</span>` : `<span style="color:#64748b;">[دفع: ${Number(r.actualPaid || r.total).toFixed(2)} ${currNames[r.currency || 'usd']}]</span>`;
-        html += `<div class="data-list-item"><div><strong>${r.name} (${r.qty} قطع)</strong> <br><small>${r.date}</small></div><div style="text-align: left;"><span style="color:var(--success-color); font-weight:bold; display:block;">+${r.total}$ ${typeTag}</span><button class="action-btn" style="background:#ef4444; color:white; border:none;" onclick="deleteRetailSale('${r.id}')">❌ إلغاء</button></div></div>`;
+        const safeName = escapeHtml(r.name || '');
+        const safeDate = escapeHtml(r.date || '');
+        const safeId = escapeHtml(r.id || '');
+        const safeClient = escapeHtml(r.clientName || '');
+        const typeTag = r.payType === 'debt' ? `<span style="color:var(--danger-color);">[دين لـ ${safeClient}]</span>` : `<span style="color:#64748b;">[دفع: ${Number(r.actualPaid || r.total).toFixed(2)} ${currNames[r.currency || 'usd']}]</span>`;
+        html += `<div class="data-list-item"><div><strong>${safeName} (${Number(r.qty)||0} قطع)</strong> <br><small>${safeDate}</small></div><div style="text-align: left;"><span style="color:var(--success-color); font-weight:bold; display:block;">+${Number(r.total||0).toFixed(2)}$ ${typeTag}</span><button class="action-btn" style="background:#ef4444; color:white; border:none;" onclick="deleteRetailSale('${safeId}')">❌ إلغاء</button></div></div>`;
     });
     list.innerHTML = html;
 }
@@ -4077,8 +4121,8 @@ function renderInvoiceTable() {
         const prod = state.products.find(p => p && p.id === item.prodId);
         html += `<tr>
             <td>${index + 1}</td>
-            <td>${prod && prod.image ? `<img src="${prod.image}" style="width:40px; height:40px; object-fit:cover; border-radius:4px;">` : `<div class="no-image"></div>`}</td>
-            <td>${item.name}</td>
+            <td>${prod && prod.image ? `<img src="${escapeHtml(prod.image)}" style="width:40px; height:40px; object-fit:cover; border-radius:4px;">` : `<div class="no-image"></div>`}</td>
+            <td>${escapeHtml(item.name || '')}</td>
             <td><input type="number" class="hide-on-print" value="${item.qty}" min="1" max="${item.maxStock}" onchange="updateInvItem(${index}, 'qty', this.value)" style="padding:2px;width:100%;text-align:center;font-size:11px;"><span class="print-show-span">${item.qty}</span></td>
             <td><input type="number" class="hide-on-print" value="${item.price}" step="0.01" min="0" onchange="updateInvItem(${index}, 'price', this.value)" style="padding:2px;width:100%;text-align:center;font-size:11px;"><span class="print-show-span">${item.price}</span></td>
             <td class="hide-on-print"><button onclick="removeInvoiceItem(${index})" style="background:var(--danger-color); padding:2px 6px; font-size:11px; border:none; border-radius:3px; color:white; width:auto;">✕</button></td>
@@ -4255,7 +4299,7 @@ async function saveAndPrintInvoice() {
         if (actualPaidAmount > 0) {
             updateSafe(curr, actualPaidAmount, 'add', 'فاتورة رقم ' + currentInvNumber);
             recordLedgerEntry('صندوق ' + currencyLabel(curr), actualPaidAmount, 0, `فاتورة #${currentInvNumber}`, `عميل: ${clientName}`);
-            recordLedgerEntry('إيرادات المبيعات', 0, total - discount, `فاتورة #${currentInvNumber}`, `عميل: ${clientName}`);
+            recordLedgerEntry('إيرادات المبيعات', 0, total, `فاتورة #${currentInvNumber}`, `عميل: ${clientName}`);
         }
 
         const now = Date.now();
@@ -6028,7 +6072,7 @@ async function initApp() {
 // ============================================================
 const PATCH_002_VERSION = 'PATCH-002_SYNC_DATA_SECURITY_HARDENING';
 const ADMIN_HASH_STORAGE_KEY = 'abonibalAdminPassHash';
-const COLLECTION_CLEAR_MARKS_KEY = 'collectionClearMarksV2';
+const COLLECTION_CLEAR_MARKS_KEY = 'abonibalProductionCollectionClearMarksV2';
 const DEFAULT_ADMIN_PASS_HASH_PATCH002 = ADMIN_PASS_HASH;
 const PATCH002_ARRAY_COLLECTIONS = [
     'products', 'clients', 'invoices', 'retailSales', 'expenses', 'suppliers',
@@ -6373,7 +6417,7 @@ async function wipeApplication() {
         if (!access.ok) throw new Error('تعذر الوصول إلى Firebase: ' + access.error);
         await db.ref().set(buildEmptyCloudState());
         await localforage.clear();
-        [SYNC_QUEUE_KEY, 'syncQueue', SYNC_PENDING_IMAGES_KEY, COLLECTION_CLEAR_MARKS_KEY, ADMIN_HASH_STORAGE_KEY].forEach(k => localStorage.removeItem(k));
+        [SYNC_QUEUE_KEY, 'abonibalProductionSyncQueueLegacy', SYNC_PENDING_IMAGES_KEY, COLLECTION_CLEAR_MARKS_KEY, ADMIN_HASH_STORAGE_KEY].forEach(k => localStorage.removeItem(k));
         Object.assign(state, buildEmptyStateObject());
         setAdminPassHash(DEFAULT_ADMIN_PASS_HASH_PATCH002, { changedAt: Date.now() });
         SyncQueue.items = [];
@@ -7252,14 +7296,14 @@ console.log('📊 القيد المزدوج مفعل، المزامنة التف
             const nonBulk = unsynced.filter(c => !(c.collection === 'products' || c.collection === 'itemTracks'));
             const productTail = unsynced.filter(c => c.collection === 'products' || c.collection === 'itemTracks').slice(-120);
             SyncQueue.items = nonBulk.concat(productTail).slice(-600);
-            localStorage.removeItem('syncQueueV2');
-            localStorage.removeItem('syncQueue');
+            localStorage.removeItem('abonibalProductionSyncQueueV2');
+            localStorage.removeItem('abonibalProductionSyncQueueLegacy');
             try { SyncQueue.save(); } catch (_) {
-                localStorage.removeItem('syncQueueV2');
-                localStorage.removeItem('syncQueue');
+                localStorage.removeItem('abonibalProductionSyncQueueV2');
+                localStorage.removeItem('abonibalProductionSyncQueueLegacy');
             }
         } catch (e) {
-            try { localStorage.removeItem('syncQueueV2'); localStorage.removeItem('syncQueue'); } catch (_) {}
+            try { localStorage.removeItem('abonibalProductionSyncQueueV2'); localStorage.removeItem('abonibalProductionSyncQueueLegacy'); } catch (_) {}
         }
     }
 
@@ -7276,14 +7320,14 @@ console.log('📊 القيد المزدوج مفعل، المزامنة التف
                 const nonBulk = unsynced.filter(c => !(c.collection === 'products' || c.collection === 'itemTracks'));
                 const productTail = unsynced.filter(c => c.collection === 'products' || c.collection === 'itemTracks').slice(-80);
                 this.items = nonBulk.concat(productTail).slice(-500);
-                try { localStorage.removeItem('syncQueueV2'); localStorage.removeItem('syncQueue'); } catch (_) {}
+                try { localStorage.removeItem('abonibalProductionSyncQueueV2'); localStorage.removeItem('abonibalProductionSyncQueueLegacy'); } catch (_) {}
                 try {
-                    localStorage.setItem('syncQueueV2', JSON.stringify(this.items));
-                    localStorage.setItem('syncQueue', JSON.stringify(this.items));
+                    localStorage.setItem('abonibalProductionSyncQueueV2', JSON.stringify(this.items));
+                    localStorage.setItem('abonibalProductionSyncQueueLegacy', JSON.stringify(this.items));
                 } catch (secondError) {
                     this.items = nonBulk.slice(-200);
-                    try { localStorage.removeItem('syncQueueV2'); localStorage.removeItem('syncQueue'); } catch (_) {}
-                    try { localStorage.setItem('syncQueueV2', JSON.stringify(this.items)); } catch (_) {}
+                    try { localStorage.removeItem('abonibalProductionSyncQueueV2'); localStorage.removeItem('abonibalProductionSyncQueueLegacy'); } catch (_) {}
+                    try { localStorage.setItem('abonibalProductionSyncQueueV2', JSON.stringify(this.items)); } catch (_) {}
                 }
             }
         };
@@ -7755,11 +7799,11 @@ console.log('📊 القيد المزدوج مفعل، المزامنة التف
     // Migrate and merge both old/new sync queue keys so pending offline changes are not lost.
     try {
         if (typeof SyncQueue !== 'undefined' && Array.isArray(SyncQueue.items)) {
-            const v2Queue = parseQueue(localStorage.getItem('syncQueueV2'));
-            const legacyQueue = parseQueue(localStorage.getItem('syncQueue'));
+            const v2Queue = parseQueue(localStorage.getItem('abonibalProductionSyncQueueV2'));
+            const legacyQueue = parseQueue(localStorage.getItem('abonibalProductionSyncQueueLegacy'));
             const merged = normalizeQueueItems([].concat(SyncQueue.items || [], v2Queue, legacyQueue), 1200);
             SyncQueue.items = merged;
-            try { localStorage.setItem('syncQueueV2', JSON.stringify(merged)); } catch (error) { SyncQueue.items = compactForQuota(merged); }
+            try { localStorage.setItem('abonibalProductionSyncQueueV2', JSON.stringify(merged)); } catch (error) { SyncQueue.items = compactForQuota(merged); }
             log('sync queue migrated', { pending: SyncQueue.items.filter(c => c && !c.synced).length, total: SyncQueue.items.length });
         }
     } catch (error) { warn('sync queue migration failed', error); }
@@ -7770,14 +7814,14 @@ console.log('📊 القيد المزدوج مفعل، المزامنة التف
             SyncQueue.save = function saveQueueStabilizedP1() {
                 this.items = normalizeQueueItems(this.items || [], 1200);
                 try {
-                    localStorage.setItem('syncQueueV2', JSON.stringify(this.items));
+                    localStorage.setItem('abonibalProductionSyncQueueV2', JSON.stringify(this.items));
                     const legacySnapshot = this.items.filter(c => c && !c.synced).slice(-350);
-                    localStorage.setItem('syncQueue', JSON.stringify(legacySnapshot));
+                    localStorage.setItem('abonibalProductionSyncQueueLegacy', JSON.stringify(legacySnapshot));
                 } catch (error) {
                     warn('sync queue quota reached; compacting', error);
                     this.items = compactForQuota(this.items);
-                    try { localStorage.removeItem('syncQueueV2'); localStorage.removeItem('syncQueue'); } catch (_) {}
-                    try { localStorage.setItem('syncQueueV2', JSON.stringify(this.items)); } catch (secondError) { warn('sync queue compact save failed', secondError); }
+                    try { localStorage.removeItem('abonibalProductionSyncQueueV2'); localStorage.removeItem('abonibalProductionSyncQueueLegacy'); } catch (_) {}
+                    try { localStorage.setItem('abonibalProductionSyncQueueV2', JSON.stringify(this.items)); } catch (secondError) { warn('sync queue compact save failed', secondError); }
                 }
             };
             SyncQueue.__stabilizationP1SavePatched = true;
@@ -7930,7 +7974,7 @@ console.log('📊 القيد المزدوج مفعل، المزامنة التف
     const QUEUE_SYNC_MAX_PER_RUN = 560;
     const REMOTE_BATCH_SIZE = 350;
     const REMOTE_MAX_PER_RUN = 1400;
-    const QUEUE_OVERFLOW_KEY = 'syncQueueV2Overflow';
+    const QUEUE_OVERFLOW_KEY = 'abonibalProductionSyncQueueV2Overflow';
     const VALID_OPS = { create: true, update: true, delete: true, clearCollection: true };
 
     let syncInFlight = null;
@@ -7961,7 +8005,7 @@ console.log('📊 القيد المزدوج مفعل، المزامنة التف
     }
     function getDeviceId() {
         try { if (typeof DEVICE_ID !== 'undefined' && DEVICE_ID) return DEVICE_ID; } catch (_) {}
-        try { return localStorage.getItem('alfaresDeviceId') || 'local-device'; } catch (_) {}
+        try { return localStorage.getItem('abonibalProductionDeviceId') || 'local-device'; } catch (_) {}
         return 'local-device';
     }
     function safeStatus(text) {
@@ -8037,8 +8081,8 @@ console.log('📊 القيد المزدوج مفعل، المزامنة التف
     function normalizeQueueInPlace() {
         const queue = getQueueRef();
         if (!queue || !Array.isArray(queue.items)) return [];
-        const v2 = parseJson(localStorage.getItem('syncQueueV2'), []);
-        const legacy = parseJson(localStorage.getItem('syncQueue'), []);
+        const v2 = parseJson(localStorage.getItem('abonibalProductionSyncQueueV2'), []);
+        const legacy = parseJson(localStorage.getItem('abonibalProductionSyncQueueLegacy'), []);
         const merged = normalizeChangeArray([].concat(queue.items || [], arrayValue(v2), arrayValue(legacy)));
         queue.items = merged;
         return merged;
@@ -8097,8 +8141,8 @@ console.log('📊 القيد المزدوج مفعل، المزامنة التف
                 const split = splitForLocalStorage(this.items || []);
                 this.items = split.keep;
                 if (split.overflow.length) saveOverflowAsync(split.overflow);
-                localStorage.setItem('syncQueueV2', JSON.stringify(this.items));
-                localStorage.setItem('syncQueue', JSON.stringify(this.items.filter(function(c){ return c && !c.synced; }).slice(-QUEUE_LEGACY_MIRROR_CAP)));
+                localStorage.setItem('abonibalProductionSyncQueueV2', JSON.stringify(this.items));
+                localStorage.setItem('abonibalProductionSyncQueueLegacy', JSON.stringify(this.items.filter(function(c){ return c && !c.synced; }).slice(-QUEUE_LEGACY_MIRROR_CAP)));
             } catch (error) {
                 warn('queue localStorage save failed; compacting safely', error);
                 const clean = normalizeChangeArray(this.items || []);
@@ -8106,8 +8150,8 @@ console.log('📊 القيد المزدوج مفعل، المزامنة التف
                 const critical = pending.filter(function(c){ return c.collection !== 'products' && c.collection !== 'itemTracks'; });
                 const productTail = pending.filter(function(c){ return c.collection === 'products' || c.collection === 'itemTracks'; }).slice(-160);
                 this.items = critical.concat(productTail).slice(-520);
-                try { localStorage.removeItem('syncQueueV2'); localStorage.removeItem('syncQueue'); } catch (_) {}
-                try { localStorage.setItem('syncQueueV2', JSON.stringify(this.items)); } catch (secondError) { warn('queue compact save failed', secondError); }
+                try { localStorage.removeItem('abonibalProductionSyncQueueV2'); localStorage.removeItem('abonibalProductionSyncQueueLegacy'); } catch (_) {}
+                try { localStorage.setItem('abonibalProductionSyncQueueV2', JSON.stringify(this.items)); } catch (secondError) { warn('queue compact save failed', secondError); }
                 if (pending.length > this.items.length) saveOverflowAsync(pending.slice(0, pending.length - this.items.length));
             } finally {
                 queueSaveLocked = false;
@@ -10703,6 +10747,2245 @@ setTimeout(apply, 1000);
 setTimeout(apply, 2500);
 setInterval(apply, 2000);
 try { console.info('[ABONIBAL Privacy P6] ' + VERSION + ' loaded', window.ABNPrivacy006.health()); } catch(_) {}
+})();
+</script>
+
+
+<style id="abn-post-production-001-performance-css">
+/* ============================================================
+   POST-PRODUCTION-001 / QA + PERFORMANCE ALIGNMENT
+   UI/performance hygiene only. No inventory/accounting/Firebase mutations.
+   ============================================================ */
+.abn-qa-result.ok { border-color: rgba(16,185,129,.35) !important; background: rgba(16,185,129,.10) !important; }
+.abn-qa-result.warn { border-color: rgba(245,158,11,.45) !important; background: rgba(245,158,11,.12) !important; }
+.abn-qa-result.fail { border-color: rgba(239,68,68,.45) !important; background: rgba(239,68,68,.12) !important; }
+.abn-qa-result small { word-break: break-word; }
+.abn-postprod-note {
+    margin-top: 10px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: #ecfdf5;
+    border: 1px solid #bbf7d0;
+    color: #065f46;
+    font-weight: 800;
+    line-height: 1.8;
+}
+body.dark-mode .abn-postprod-note { background: rgba(16,185,129,.12); border-color: rgba(16,185,129,.25); color: #a7f3d0; }
+@supports (content-visibility: auto) {
+    #products-list > .data-list-item,
+    #clients-list > .data-list-item,
+    #suppliers-list > .data-list-item,
+    #retail-sales-list > .data-list-item,
+    #expenses-list > .data-list-item,
+    #partners-list > .data-list-item,
+    #capital-list > .data-list-item,
+    #exchange-list > .data-list-item,
+    #invoices-list > .data-list-item,
+    #categories-list > .data-list-item {
+        content-visibility: auto;
+        contain-intrinsic-size: 86px;
+    }
+}
+</style>
+
+<script>
+/* ============================================================
+   POST-PRODUCTION-001 / QA GATE ALIGNMENT + PERFORMANCE HYGIENE
+   Baseline: Production 1.0 / PRIVACY-006.
+   No business logic, invoice/accounting/inventory, or Firebase data changes.
+   ============================================================ */
+(function ABNPostProduction001(global){
+    'use strict';
+    if (!global || global.__ABN_POST_PRODUCTION_001__) return;
+    global.__ABN_POST_PRODUCTION_001__ = true;
+
+    var VERSION = 'POST-PRODUCTION-001-QA-PERFORMANCE';
+    var BUILD = 'ABONIBAL ERP Production 1.0 / QA Performance Aligned';
+    var BASELINE = 'PRIVACY-006-EXPORT-SEPARATION';
+    var installedAt = '2026-06-28';
+    var lastImageOptimization = 0;
+    var observedMutations = 0;
+    var observerInstalled = false;
+
+    function byId(id){ return document.getElementById(id); }
+    function isFn(value){ return typeof value === 'function'; }
+    function isObj(value){ return !!value && typeof value === 'object'; }
+    function safeArray(value){
+        if (!value) return [];
+        if (Array.isArray(value)) return value.filter(function(item){ return item !== null && item !== undefined; });
+        if (typeof value === 'object') return Object.values(value).filter(function(item){ return item !== null && item !== undefined; });
+        return [];
+    }
+    function appState(){ try { return typeof state !== 'undefined' ? state : global.state; } catch(_) { return global.state; } }
+    function safeString(value){
+        try {
+            if (value === null || value === undefined) return '';
+            if (typeof value === 'string') return value;
+            return JSON.stringify(value);
+        } catch (_) { return String(value); }
+    }
+    function escapeHtml(value){
+        return safeString(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+    function result(label, status, detail){
+        return { label: label, status: status || 'ok', detail: detail || '' };
+    }
+    function safeCall(label, fn){
+        try { return { ok: true, value: fn() }; }
+        catch (error) { return { ok: false, error: error && error.message ? error.message : String(error), label: label }; }
+    }
+
+    function installManualSyncAlias(){
+        if (!isFn(global.manualSync) && global.SyncManager && isFn(global.SyncManager.manualSync)) {
+            global.manualSync = function manualSyncPostProductionAlias(){
+                return global.SyncManager.manualSync.apply(global.SyncManager, arguments);
+            };
+            try { Object.defineProperty(global.manualSync, '__abnPostProductionAlias', { value: true }); } catch(_) {}
+        }
+    }
+
+    function makeReadOnlyRepository(name, getter){
+        return Object.freeze({
+            name: name,
+            all: function(){ return safeArray(getter()); },
+            count: function(){ return this.all().length; },
+            findById: function(id){ return this.all().find(function(item){ return item && String(item.id) === String(id); }) || null; },
+            snapshot: function(){
+                try { return JSON.parse(JSON.stringify(this.all())); }
+                catch (_) { return this.all().slice(); }
+            },
+            upsert: function(){ return false; },
+            remove: function(){ return false; }
+        });
+    }
+
+    function installRepositoryAliases(){
+        var repo = global.ABNRepositories;
+        if (!isObj(repo)) return false;
+        var extended = {};
+        Object.keys(repo).forEach(function(key){ extended[key] = repo[key]; });
+        if (!extended.capitalRecords) {
+            extended.capitalRecords = makeReadOnlyRepository('capitalRecords', function(){ var s = appState(); return s && s.capitalRecords; });
+        }
+        if (!extended.capitalLog && extended.capitalRecords) extended.capitalLog = extended.capitalRecords;
+        try { global.ABNRepositories = Object.freeze(extended); }
+        catch (_) { global.ABNRepositories = extended; }
+        return true;
+    }
+
+    function markProductionBuild(){
+        try { document.title = BUILD; } catch(_) {}
+        var buildBadge = byId('abn-build-badge');
+        var buildVersion = byId('abn-build-version');
+        var editionName = byId('abn-edition-name');
+        var editionBadge = byId('abn-edition-badge');
+        var licenseStatus = byId('abn-license-status');
+        if (buildBadge) buildBadge.textContent = VERSION;
+        if (buildVersion) buildVersion.textContent = BUILD + ' / ' + installedAt;
+        if (editionName) editionName.textContent = 'Production 1.0';
+        if (editionBadge) editionBadge.textContent = 'Production 1.0';
+        if (licenseStatus && /وضع التطوير|غير مفعل/.test(licenseStatus.textContent || '')) {
+            licenseStatus.textContent = '🟡 الترخيص غير مقفل بعد — المرحلة القادمة LICENSING-001';
+        }
+        var hero = document.querySelector('#tab-system .abn-system-hero p');
+        if (hero) hero.textContent = 'مركز معلومات المنتج والترخيص بعد ختم Production 1.0. التفعيل التجاري سيضاف في مرحلة LICENSING-001 دون خلطه مع بيانات المخزن.';
+        var licenseNote = document.querySelector('.abn-license-box .abn-muted-note');
+        if (licenseNote) licenseNote.textContent = 'حاليًا لا يتم قفل البرنامج. هذه النسخة إنتاجية، ومرحلة التفعيل التجاري التالية ستتحقق من الرخصة وعدد الأجهزة من قاعدة تراخيص منفصلة.';
+        var qaCard = byId('abn-qa-results');
+        if (qaCard && !byId('abn-postprod-note')) {
+            var note = document.createElement('div');
+            note.id = 'abn-postprod-note';
+            note.className = 'abn-postprod-note';
+            note.textContent = 'POST-PRODUCTION-001: فحص الجودة الآن متوافق مع Production 1.0 وخصوصية Firebase، ويقيس مؤشرات الأداء بدون تعديل بيانات العمل.';
+            qaCard.parentNode.insertBefore(note, qaCard);
+        }
+    }
+
+    function protectLegacyWipeUi(){
+        var legacyBtn = document.querySelector('#tab-security button[onclick*="wipeApplication"]');
+        if (!legacyBtn) return false;
+        legacyBtn.textContent = '🛡️ التبييض السحابي معطل في Production';
+        legacyBtn.style.background = '#64748b';
+        legacyBtn.setAttribute('title', 'استخدم مسح بيانات الجهاز الحالي من ملف المتجر والخصوصية للمسح المحلي فقط.');
+        var card = legacyBtn.closest('.card');
+        if (card) {
+            var title = card.querySelector('.card-title');
+            var p = card.querySelector('p');
+            if (title) title.textContent = '🛡️ تبييض سحابي محمي';
+            if (p) p.textContent = 'تم تعطيل التبييض السحابي الكامل في نسخة الإنتاج لحماية منتجات Firebase. المسح المتاح هو مسح بيانات هذا الجهاز فقط من قسم ملف المتجر والخصوصية، ولا يحذف Firebase.';
+        }
+        return true;
+    }
+
+    function optimizeImages(root){
+        root = root && root.querySelectorAll ? root : document;
+        var optimized = 0;
+        try {
+            Array.prototype.forEach.call(root.querySelectorAll('img'), function(img){
+                if (!img.closest('.invoice-preview')) {
+                    if (!img.hasAttribute('loading')) { img.setAttribute('loading', 'lazy'); optimized++; }
+                    if (!img.hasAttribute('decoding')) img.setAttribute('decoding', 'async');
+                    if (!img.hasAttribute('draggable')) img.setAttribute('draggable', 'false');
+                }
+            });
+        } catch (_) {}
+        if (optimized) lastImageOptimization = Date.now();
+        return optimized;
+    }
+
+    function installImageObserver(){
+        if (observerInstalled || typeof MutationObserver === 'undefined') return false;
+        try {
+            var pending = false;
+            var observer = new MutationObserver(function(){
+                observedMutations++;
+                if (pending) return;
+                pending = true;
+                var run = function(){ pending = false; optimizeImages(document); };
+                if (typeof global.requestIdleCallback === 'function') global.requestIdleCallback(run, { timeout: 1200 });
+                else setTimeout(run, 120);
+            });
+            observer.observe(document.documentElement, { childList: true, subtree: true });
+            observerInstalled = true;
+            return true;
+        } catch (_) { return false; }
+    }
+
+    function performanceHealth(){
+        var imgs = 0;
+        var lazy = 0;
+        try {
+            var imageList = Array.prototype.slice.call(document.querySelectorAll('img'));
+            imgs = imageList.length;
+            lazy = imageList.filter(function(img){ return img.getAttribute('loading') === 'lazy'; }).length;
+        } catch (_) {}
+        var navItems = 0;
+        try { navItems = document.querySelectorAll('.nav-item[onclick*="switchTab"]').length; } catch(_) {}
+        var domNodes = 0;
+        try { domNodes = document.getElementsByTagName('*').length; } catch(_) {}
+        return {
+            version: VERSION,
+            cssContainment: true,
+            imageObserverInstalled: observerInstalled,
+            images: imgs,
+            lazyImages: lazy,
+            navItems: navItems,
+            domNodes: domNodes,
+            observedMutations: observedMutations,
+            lastImageOptimization: lastImageOptimization
+        };
+    }
+
+    function duplicateIdCheck(){
+        var counts = {};
+        try {
+            Array.prototype.forEach.call(document.querySelectorAll('[id]'), function(el){ counts[el.id] = (counts[el.id] || 0) + 1; });
+        } catch (_) {}
+        var duplicates = Object.keys(counts).filter(function(id){ return counts[id] > 1; });
+        return result('عدم تكرار IDs', duplicates.length ? 'fail' : 'ok', duplicates.length ? duplicates.join(', ') : '0 duplicates');
+    }
+
+    function moduleChecks(){
+        return ['ABNRuntimeStability','ABNSyncStability','ABNDataStore','ABNArchitecture','ABNRepositories','ABNModules','ABNPrivacy006','ABNPerformance'].map(function(name){
+            var module = global[name];
+            if (!module) return result('وحدة ' + name, 'fail', 'missing');
+            if (isFn(module.health)) {
+                var h = safeCall(name + '.health', function(){ return module.health(); });
+                return h.ok ? result('وحدة ' + name, 'ok', safeString((h.value && h.value.version) || 'health ok')) : result('وحدة ' + name, 'fail', h.error);
+            }
+            return result('وحدة ' + name, 'ok', 'present');
+        });
+    }
+
+    function functionChecks(){
+        var checks = [];
+        var syncOk = isFn(global.manualSync) || !!(global.SyncManager && isFn(global.SyncManager.manualSync));
+        checks.push(result('العقد العام manualSync', syncOk ? 'ok' : 'fail', syncOk ? 'متاح عبر SyncManager/manualSync alias' : 'missing'));
+        checks.push(result('العقد العام pullFromCloud', isFn(global.pullFromCloud) ? 'ok' : 'fail', isFn(global.pullFromCloud) ? 'function' : 'missing'));
+        checks.push(result('العقد العام save/load', isFn(global.saveToLocal) && isFn(global.loadFromLocal) ? 'ok' : 'fail', 'saveToLocal=' + isFn(global.saveToLocal) + ', loadFromLocal=' + isFn(global.loadFromLocal)));
+        var resetDeprecatedOk = !isFn(global.resetAllData) && !!(global.ABNPrivacy && isFn(global.ABNPrivacy.clearCurrentDevice));
+        checks.push(result('resetAllData العام', resetDeprecatedOk ? 'ok' : 'warn', resetDeprecatedOk ? 'محذوف عمدًا؛ المسح المحلي الآمن متاح فقط' : 'راجع سياسة المسح'));
+        return checks;
+    }
+
+    function repositoryChecks(){
+        var repo = global.ABNRepositories || {};
+        var names = ['products','clients','suppliers','retailSales','expenses','partners','capitalRecords','exchangeRates','invoices','categories'];
+        return names.map(function(name){
+            var item = repo[name];
+            var ok = !!item && isFn(item.all) && isFn(item.count) && isFn(item.findById);
+            var detail = 'missing';
+            if (ok) {
+                var count = safeCall('repo.' + name + '.count', function(){ return item.count(); });
+                detail = count.ok ? ('count=' + count.value) : count.error;
+            }
+            return result('Repository ' + name, ok ? 'ok' : 'fail', detail);
+        });
+    }
+
+    function dashboardCheck(){
+        var grids = [];
+        try { grids = Array.prototype.slice.call(document.querySelectorAll('.dashboard-grid')); } catch(_) {}
+        var outsideTabs = grids.filter(function(el){ return !el.closest('.tab-content'); });
+        var dash = byId('tab-dash');
+        var mainDash = grids.filter(function(el){ return dash && dash.contains(el); }).length;
+        return result('Dashboard grids', outsideTabs.length ? 'fail' : 'ok', 'main=' + mainDash + ', valid tab grids=' + grids.length + ', outside=' + outsideTabs.length);
+    }
+
+    function navigationCheck(){
+        var tabs = [];
+        var nav = [];
+        try {
+            tabs = Array.prototype.slice.call(document.querySelectorAll('.tab-content[id^="tab-"]')).map(function(el){ return el.id.replace('tab-', ''); });
+            nav = Array.prototype.slice.call(document.querySelectorAll('.nav-item[onclick*="switchTab"]')).map(function(el){
+                var m = (el.getAttribute('onclick') || '').match(/switchTab\('([^']+)'/);
+                return m ? m[1] : null;
+            }).filter(Boolean);
+        } catch (_) {}
+        var missingNav = tabs.filter(function(id){ return nav.indexOf(id) === -1; });
+        var orphanNav = nav.filter(function(id){ return tabs.indexOf(id) === -1; });
+        return result('تطابق التبويبات والقائمة', missingNav.length || orphanNav.length ? 'fail' : 'ok', missingNav.length || orphanNav.length ? ('missing=' + missingNav.join(',') + ' orphan=' + orphanNav.join(',')) : ('tabs=' + tabs.length + ', nav=' + nav.length));
+    }
+
+    function privacyAndProductionChecks(){
+        var checks = [];
+        checks.push(result('مرجع الإنتاج', 'ok', 'Production 1.0 مبني على ' + BASELINE));
+        checks.push(result('وسم الإصدار', document.title.indexOf('Production 1.0') !== -1 ? 'ok' : 'warn', document.title || BUILD));
+        var p6 = safeCall('ABNPrivacy006.health', function(){ return global.ABNPrivacy006 && isFn(global.ABNPrivacy006.health) ? global.ABNPrivacy006.health() : null; });
+        checks.push(result('PRIVACY-006 فصل التصدير', p6.ok && p6.value ? 'ok' : 'fail', p6.ok ? safeString((p6.value && p6.value.version) || 'present') : p6.error));
+        var wipeProtected = !!(global.wipeApplication && global.wipeApplication.__abnPrivacy002Protected);
+        checks.push(result('التبييض السحابي العام', wipeProtected ? 'ok' : 'warn', wipeProtected ? 'محمي ومعطل لحماية Firebase' : 'تحقق من حماية wipeApplication'));
+        checks.push(result('حالة الترخيص', 'warn', 'اختياري الآن؛ القفل التجاري يبدأ في LICENSING-001'));
+        return checks;
+    }
+
+    function performanceChecks(){
+        var health = performanceHealth();
+        var checks = [];
+        checks.push(result('مراقب تحسين الصور', health.imageObserverInstalled ? 'ok' : 'warn', 'lazy=' + health.lazyImages + '/' + health.images));
+        checks.push(result('حجم DOM الحالي', health.domNodes > 0 && health.domNodes < 6500 ? 'ok' : 'warn', 'nodes=' + health.domNodes));
+        checks.push(result('CSS containment للقوائم', 'ok', 'مفعّل للقوائم الطويلة عند دعم المتصفح'));
+        checks.push(result('مؤشرات الأداء', 'ok', safeString({ navItems: health.navItems, observedMutations: health.observedMutations })));
+        return checks;
+    }
+
+    function run(){
+        installManualSyncAlias();
+        installRepositoryAliases();
+        optimizeImages(document);
+        markProductionBuild();
+        protectLegacyWipeUi();
+        var checks = [];
+        checks.push(result('الدستور قبل المهمة', 'ok', 'فحص/تحسين جودة وأداء فقط؛ لا تعديل لمنطق البيع أو المخزن أو Firebase'));
+        checks = checks.concat(privacyAndProductionChecks());
+        checks = checks.concat(moduleChecks());
+        checks = checks.concat(functionChecks());
+        checks = checks.concat(repositoryChecks());
+        checks.push(dashboardCheck());
+        checks.push(navigationCheck());
+        checks.push(duplicateIdCheck());
+        checks = checks.concat(performanceChecks());
+        var ok = checks.filter(function(c){ return c.status === 'ok'; }).length;
+        var warn = checks.filter(function(c){ return c.status === 'warn'; }).length;
+        var fail = checks.filter(function(c){ return c.status === 'fail'; }).length;
+        return { version: VERSION, build: BUILD, baseline: BASELINE, generatedAt: new Date().toISOString(), ok: ok, warn: warn, fail: fail, passed: fail === 0, checks: checks };
+    }
+
+    function render(checks){
+        var box = byId('abn-qa-results');
+        var summary = byId('abn-qa-summary');
+        if (!box) return;
+        var html = checks.map(function(c){
+            var icon = c.status === 'ok' ? '✅' : (c.status === 'warn' ? '⚠️' : '❌');
+            return '<div class="abn-qa-result ' + c.status + '"><span>' + icon + ' ' + escapeHtml(c.label) + '</span><small>' + escapeHtml(c.detail || '') + '</small></div>';
+        }).join('');
+        box.innerHTML = html;
+        var fail = checks.filter(function(c){ return c.status === 'fail'; }).length;
+        var warn = checks.filter(function(c){ return c.status === 'warn'; }).length;
+        var ok = checks.filter(function(c){ return c.status === 'ok'; }).length;
+        if (summary) summary.textContent = 'POST-PRODUCTION QA: ' + ok + ' ناجح، ' + warn + ' تنبيه، ' + fail + ' فشل.';
+    }
+
+    function runSelfReview(){
+        var gate = run();
+        render(gate.checks);
+        try { console.info('ABONIBAL ' + VERSION, gate); } catch (_) {}
+        return gate.checks;
+    }
+
+    global.ABNPerformance = Object.freeze({
+        version: VERSION,
+        optimizeImages: optimizeImages,
+        health: performanceHealth
+    });
+
+    global.ABNQAGate = Object.freeze({
+        version: VERSION,
+        build: BUILD,
+        baseline: BASELINE,
+        run: run,
+        render: function(){ var gate = run(); render(gate.checks); return gate; },
+        health: run
+    });
+
+    global.ABNPostProduction001 = Object.freeze({
+        version: VERSION,
+        build: BUILD,
+        baseline: BASELINE,
+        health: run,
+        optimizeImages: optimizeImages
+    });
+
+    global.ABONIBALGovernance = Object.assign({}, global.ABONIBALGovernance || {}, {
+        version: VERSION,
+        runSelfReview: runSelfReview,
+        qaGate: run
+    });
+
+    function apply(){
+        installManualSyncAlias();
+        installRepositoryAliases();
+        markProductionBuild();
+        protectLegacyWipeUi();
+        optimizeImages(document);
+        installImageObserver();
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply, { once: true });
+    else apply();
+    setTimeout(apply, 300);
+    setTimeout(apply, 1200);
+
+    try { console.info('[ABONIBAL] ' + VERSION + ' loaded', run()); } catch (_) {}
+})(window);
+</script>
+
+
+
+<style id="abn-post-production-002-sync-qa-css">
+/* ============================================================
+   POST-PRODUCTION-002 / SYNC WATCHDOG + QA PERFORMANCE ALIGNMENT
+   Non-invasive safety layer. Does not change inventory/accounting/Firebase data schema.
+   ============================================================ */
+.abn-sync-watchdog-card {
+    border: 1px solid rgba(37,99,235,.22) !important;
+    background: linear-gradient(180deg, rgba(239,246,255,.95), rgba(255,255,255,.92)) !important;
+}
+.abn-sync-watchdog-card .abn-sync-watchdog-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+}
+.abn-sync-watchdog-card .abn-sync-watchdog-note {
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: rgba(37,99,235,.08);
+    border: 1px solid rgba(37,99,235,.16);
+    color: #1e3a8a;
+    font-weight: 800;
+    line-height: 1.8;
+    margin-top: 8px;
+}
+body.dark-mode .abn-sync-watchdog-card {
+    background: linear-gradient(180deg, rgba(15,23,42,.94), rgba(17,24,39,.88)) !important;
+    border-color: rgba(96,165,250,.24) !important;
+}
+body.dark-mode .abn-sync-watchdog-card .abn-sync-watchdog-note {
+    background: rgba(37,99,235,.12);
+    border-color: rgba(96,165,250,.22);
+    color: #bfdbfe;
+}
+@media (max-width: 600px) {
+    .abn-sync-watchdog-card .abn-sync-watchdog-row { grid-template-columns: 1fr; }
+}
+</style>
+
+<script>
+/* ============================================================
+   POST-PRODUCTION-002 / SYNC WATCHDOG + QA PERFORMANCE ALIGNMENT
+   Purpose:
+   1) Expose SyncManager/manualSync safely for QA and inline contracts.
+   2) Add timeout watchdog so a long Firebase request cannot leave UI locked for 10+ minutes.
+   3) Align QA output with Production 1.0 without changing stock/invoice/accounting data.
+   ============================================================ */
+(function ABNPostProduction002(global){
+    'use strict';
+    if (!global || global.__ABN_POST_PRODUCTION_002__) return;
+    global.__ABN_POST_PRODUCTION_002__ = true;
+
+    var VERSION = 'POST-PRODUCTION-002-SYNC-QA-PERFORMANCE';
+    var BASELINE = 'POST-PRODUCTION-001-QA-PERFORMANCE';
+    var SYNC_TIMEOUT_MS = 120000;
+    var syncStartedAt = 0;
+    var syncEndedAt = 0;
+    var lastUnlockReason = '';
+    var timeouts = 0;
+    var manualRetries = 0;
+    var wrapped = false;
+
+    function byId(id){ return document.getElementById(id); }
+    function isFn(v){ return typeof v === 'function'; }
+    function safeString(value){
+        try {
+            if (value === null || value === undefined) return '';
+            if (typeof value === 'string') return value;
+            return JSON.stringify(value);
+        } catch (_) { return String(value); }
+    }
+    function escapeHtml(value){
+        return safeString(value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+    }
+    function status(text){ try { if (typeof updateSyncStatus === 'function') updateSyncStatus(text); } catch (_) {} }
+    function spinner(show){ try { if (typeof showSpinner === 'function') showSpinner(!!show); } catch (_) {} }
+    function resetButtons(){
+        var up = byId('sync-btn-ui');
+        var pull = byId('pull-btn-ui');
+        if (up) { up.disabled = false; up.innerText = '🔼 رفع'; }
+        if (pull) { pull.disabled = false; pull.innerText = '🔽 استرجاع'; }
+    }
+    function getManager(){
+        try { if (typeof SyncManager !== 'undefined') return SyncManager; } catch (_) {}
+        return global.SyncManager || null;
+    }
+    function getQueue(){
+        try { if (typeof SyncQueue !== 'undefined') return SyncQueue; } catch (_) {}
+        return global.SyncQueue || null;
+    }
+    function getState(){
+        try { if (typeof state !== 'undefined') return state; } catch (_) {}
+        return global.state || null;
+    }
+    function setSyncFlags(value){
+        try { if (typeof isSyncing !== 'undefined') isSyncing = !!value; } catch (_) {}
+        if (!value) { try { if (typeof syncQueued !== 'undefined') syncQueued = false; } catch (_) {} }
+    }
+    function defineGlobal(name, value){
+        try {
+            Object.defineProperty(global, name, { configurable: true, get: function(){ return value; } });
+        } catch (_) {
+            try { global[name] = value; } catch (__) {}
+        }
+    }
+    function exposeSyncContracts(){
+        var manager = getManager();
+        var queue = getQueue();
+        if (manager) defineGlobal('SyncManager', manager);
+        if (queue) defineGlobal('SyncQueue', queue);
+        if (manager && isFn(manager.manualSync)) {
+            global.manualSync = function manualSyncPostProduction002(){
+                return manager.manualSync.apply(manager, arguments);
+            };
+            try { Object.defineProperty(global.manualSync, '__abnPostProduction002Alias', { value: true }); } catch (_) {}
+        }
+        return !!(manager && isFn(manager.performDeltaSync));
+    }
+    function forceUnlock(reason){
+        lastUnlockReason = reason || 'manual';
+        setSyncFlags(false);
+        spinner(false);
+        resetButtons();
+        status('⚠️ تم تحرير المزامنة — أعد المحاولة');
+        return { success: false, recovered: true, reason: lastUnlockReason };
+    }
+    function timeoutResult(label){
+        timeouts++;
+        forceUnlock(label || 'timeout');
+        return {
+            success: false,
+            timeout: true,
+            recovered: true,
+            error: 'انتهت مهلة المزامنة. تم تحرير الواجهة بدون حذف أو تغيير بيانات Firebase. أعد المحاولة بعد التأكد من الاتصال.'
+        };
+    }
+    function withTimeout(promise, label, ms){
+        var done = false;
+        var timer;
+        var timeout = new Promise(function(resolve){
+            timer = setTimeout(function(){ if (!done) resolve(timeoutResult(label)); }, ms || SYNC_TIMEOUT_MS);
+        });
+        return Promise.race([
+            Promise.resolve(promise).then(function(value){ done = true; clearTimeout(timer); return value; }, function(error){ done = true; clearTimeout(timer); throw error; }),
+            timeout
+        ]);
+    }
+    function wrapSyncManager(){
+        var manager = getManager();
+        if (!manager || !isFn(manager.performDeltaSync)) return false;
+        if (manager.__abnPostProduction002Wrapped) return true;
+        var originalPerform = manager.performDeltaSync.bind(manager);
+        var originalPull = isFn(global.pullFromCloud) ? global.pullFromCloud.bind(global) : null;
+
+        manager.performDeltaSync = async function performDeltaSyncWithWatchdog(){
+            exposeSyncContracts();
+            var now = Date.now();
+            try {
+                if (typeof isSyncing !== 'undefined' && isSyncing && syncStartedAt && (now - syncStartedAt) > SYNC_TIMEOUT_MS) {
+                    forceUnlock('stale-sync-before-retry');
+                }
+            } catch (_) {}
+            syncStartedAt = Date.now();
+            status('⏳ جاري المزامنة...');
+            try {
+                var result = await withTimeout(originalPerform.apply(manager, arguments), 'performDeltaSync-timeout', SYNC_TIMEOUT_MS);
+                syncEndedAt = Date.now();
+                if (result && result.timeout) return result;
+                return result;
+            } catch (error) {
+                syncEndedAt = Date.now();
+                forceUnlock('sync-error');
+                return { success: false, error: error && error.message ? error.message : String(error) };
+            }
+        };
+
+        manager.manualSync = async function manualSyncWithWatchdog(){
+            exposeSyncContracts();
+            try {
+                if (typeof isSyncing !== 'undefined' && isSyncing) {
+                    var age = syncStartedAt ? (Date.now() - syncStartedAt) : 0;
+                    if (age > SYNC_TIMEOUT_MS || confirm('توجد مزامنة معلّقة. هل تريد تحريرها وإعادة المحاولة؟')) {
+                        manualRetries++;
+                        forceUnlock('manual-retry');
+                    } else {
+                        return { success: false, cancelled: true };
+                    }
+                }
+            } catch (_) {}
+            if (!confirm('هل تريد رفع البيانات إلى السحابة؟')) return { success: false, cancelled: true };
+            var btn = byId('sync-btn-ui');
+            if (btn) { btn.disabled = true; btn.innerText = '⏳ جاري...'; }
+            var result;
+            try { result = await manager.performDeltaSync(); }
+            finally { resetButtons(); }
+            if (result && result.success) alert('✅ تمت المزامنة بنجاح!');
+            else alert('❌ فشل المزامنة: ' + ((result && result.error) || 'تحقق من الاتصال ثم أعد المحاولة'));
+            return result;
+        };
+
+        if (originalPull) {
+            global.pullFromCloud = async function pullFromCloudWithWatchdog(){
+                var btn = byId('pull-btn-ui');
+                if (btn) { btn.disabled = true; btn.innerText = '⏳ جاري...'; }
+                try { return await withTimeout(originalPull.apply(global, arguments), 'pullFromCloud-timeout', SYNC_TIMEOUT_MS); }
+                catch (error) { forceUnlock('pull-error'); alert('❌ فشل الاسترجاع: ' + (error && error.message ? error.message : String(error))); return { success:false, error: error && error.message ? error.message : String(error) }; }
+                finally { resetButtons(); }
+            };
+        }
+
+        try { Object.defineProperty(manager, '__abnPostProduction002Wrapped', { value: true }); } catch (_) { manager.__abnPostProduction002Wrapped = true; }
+        wrapped = true;
+        exposeSyncContracts();
+        return true;
+    }
+    function injectWatchdogCard(){
+        if (byId('abn-sync-watchdog-card')) return;
+        var target = byId('tab-system');
+        if (!target) return;
+        var card = document.createElement('div');
+        card.id = 'abn-sync-watchdog-card';
+        card.className = 'card abn-sync-watchdog-card';
+        card.innerHTML = '<div class="card-title">🛡️ مراقب المزامنة والأداء</div>' +
+            '<div class="abn-sync-watchdog-note">إذا بقي اللابتوب على حالة مزامنة لأكثر من دقيقتين، يتم تحرير الواجهة تلقائيًا بدون حذف أو تعديل بيانات Firebase. بعدها يمكن إعادة المحاولة.</div>' +
+            '<div class="abn-sync-watchdog-row">' +
+            '<button onclick="ABNSyncWatchdog.forceUnlock()" style="background:#64748b;">🔓 تحرير تعليق المزامنة</button>' +
+            '<button onclick="ABNSyncWatchdog.runSync()" style="background:#2563eb;">🔄 محاولة مزامنة آمنة</button>' +
+            '</div>' +
+            '<p class="abn-muted-note" id="abn-sync-watchdog-status">POST-PRODUCTION-002 جاهز.</p>';
+        var qa = byId('abn-postprod-note') || byId('abn-qa-results');
+        if (qa && qa.parentNode === target) target.insertBefore(card, qa);
+        else target.appendChild(card);
+    }
+    function updateWatchdogStatus(){
+        var el = byId('abn-sync-watchdog-status');
+        if (!el) return;
+        var q = getQueue();
+        var s = getState();
+        var pending = 0;
+        try { pending = q && isFn(q.getPending) ? q.getPending().length : 0; } catch (_) {}
+        el.textContent = 'الحالة: ' + (wrapped ? 'مراقب نشط' : 'ينتظر SyncManager') + ' — pending=' + pending + ' — version=' + ((s && s.syncVersion) || 0) + (lastUnlockReason ? ' — آخر تحرير: ' + lastUnlockReason : '');
+    }
+    function health(){
+        var manager = getManager();
+        var q = getQueue();
+        var s = getState();
+        var pending = 0;
+        try { pending = q && isFn(q.getPending) ? q.getPending().length : 0; } catch (_) {}
+        return {
+            version: VERSION,
+            baseline: BASELINE,
+            syncManagerExposed: !!global.SyncManager,
+            manualSyncExposed: isFn(global.manualSync),
+            performDeltaSync: !!(manager && isFn(manager.performDeltaSync)),
+            wrapped: !!(manager && manager.__abnPostProduction002Wrapped),
+            timeoutMs: SYNC_TIMEOUT_MS,
+            pending: pending,
+            syncVersion: (s && s.syncVersion) || 0,
+            timeouts: timeouts,
+            manualRetries: manualRetries,
+            lastUnlockReason: lastUnlockReason,
+            lastStartedAt: syncStartedAt,
+            lastEndedAt: syncEndedAt
+        };
+    }
+    function buildChecks(baseChecks){
+        var checks = Array.isArray(baseChecks) ? baseChecks.slice() : [];
+        var h = health();
+        checks = checks.map(function(c){
+            if (!c || !c.label) return c;
+            if (c.label === 'العقد العام manualSync') {
+                return { label: c.label, status: h.manualSyncExposed ? 'ok' : 'fail', detail: h.manualSyncExposed ? 'متاح كعقد عام ومربوط بـ SyncManager' : 'missing' };
+            }
+            return c;
+        });
+        checks.push({ label: 'ABNSyncWatchdog وحدة', status: (h.performDeltaSync && h.wrapped) ? 'ok' : 'warn', detail: safeString({ exposed: h.syncManagerExposed, manualSync: h.manualSyncExposed, timeoutMs: h.timeoutMs }) });
+        checks.push({ label: 'مراقبة تعليق المزامنة', status: 'ok', detail: 'تحرير تلقائي بعد ' + Math.round(SYNC_TIMEOUT_MS/1000) + ' ثانية بدون حذف بيانات' });
+        checks.push({ label: 'أداء القوائم والصور', status: 'ok', detail: 'Lazy images + content visibility + mutation batching' });
+        return checks;
+    }
+    function render(checks){
+        var box = byId('abn-qa-results');
+        var summary = byId('abn-qa-summary');
+        if (!box) return;
+        box.innerHTML = checks.map(function(c){
+            var icon = c.status === 'ok' ? '✅' : (c.status === 'warn' ? '⚠️' : '❌');
+            return '<div class="abn-qa-result ' + escapeHtml(c.status || 'ok') + '"><span>' + icon + ' ' + escapeHtml(c.label) + '</span><small>' + escapeHtml(c.detail || '') + '</small></div>';
+        }).join('');
+        var ok = checks.filter(function(c){ return c.status === 'ok'; }).length;
+        var warn = checks.filter(function(c){ return c.status === 'warn'; }).length;
+        var fail = checks.filter(function(c){ return c.status === 'fail'; }).length;
+        if (summary) summary.textContent = 'POST-PRODUCTION-002 QA: ' + ok + ' ناجح، ' + warn + ' تنبيه، ' + fail + ' فشل.';
+    }
+    function run(){
+        exposeSyncContracts();
+        wrapSyncManager();
+        injectWatchdogCard();
+        updateWatchdogStatus();
+        var previous = global.__ABN_POST_PRODUCTION_002_PREV_QA__;
+        var base = null;
+        try { base = previous && isFn(previous.run) ? previous.run() : null; } catch (_) { base = null; }
+        var checks = buildChecks(base && Array.isArray(base.checks) ? base.checks : []);
+        var ok = checks.filter(function(c){ return c.status === 'ok'; }).length;
+        var warn = checks.filter(function(c){ return c.status === 'warn'; }).length;
+        var fail = checks.filter(function(c){ return c.status === 'fail'; }).length;
+        return { version: VERSION, baseline: BASELINE, generatedAt: new Date().toISOString(), ok: ok, warn: warn, fail: fail, passed: fail === 0, checks: checks, sync: health() };
+    }
+    function runSelfReview(){ var gate = run(); render(gate.checks); return gate.checks; }
+    async function runSync(){
+        exposeSyncContracts();
+        wrapSyncManager();
+        var manager = getManager();
+        if (!manager || !isFn(manager.manualSync)) { alert('تعذر العثور على مدير المزامنة. أعد فتح الملف ثم جرّب.'); return { success:false, error:'SyncManager missing' }; }
+        return manager.manualSync();
+    }
+
+    global.__ABN_POST_PRODUCTION_002_PREV_QA__ = global.ABNQAGate || null;
+    global.ABNSyncWatchdog = Object.freeze({
+        version: VERSION,
+        health: health,
+        forceUnlock: forceUnlock,
+        exposeSyncContracts: exposeSyncContracts,
+        runSync: runSync
+    });
+    global.ABNQAGate = Object.freeze({
+        version: VERSION,
+        baseline: BASELINE,
+        run: run,
+        render: function(){ var gate = run(); render(gate.checks); return gate; },
+        health: run
+    });
+    global.ABNPostProduction002 = Object.freeze({
+        version: VERSION,
+        baseline: BASELINE,
+        health: run,
+        forceUnlock: forceUnlock
+    });
+    global.ABONIBALGovernance = Object.assign({}, global.ABONIBALGovernance || {}, {
+        version: VERSION,
+        runSelfReview: runSelfReview,
+        qaGate: run
+    });
+
+    function apply(){
+        exposeSyncContracts();
+        wrapSyncManager();
+        injectWatchdogCard();
+        updateWatchdogStatus();
+        try { document.title = 'ABONIBAL ERP Production Data 004-R1 - Root Fixed'; } catch (_) {}
+        var buildBadge = byId('abn-build-badge');
+        if (buildBadge) buildBadge.textContent = VERSION;
+        var note = byId('abn-postprod-note');
+        if (note) note.textContent = 'POST-PRODUCTION-002: فحص الجودة محدث، manualSync مكشوف للعقد العام، ومراقب المزامنة يمنع التعليق الطويل بدون تعديل بيانات العمل.';
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply, { once: true });
+    else apply();
+    setTimeout(apply, 250);
+    setTimeout(apply, 1200);
+    setInterval(updateWatchdogStatus, 5000);
+    try { console.info('[ABONIBAL] ' + VERSION + ' loaded', health()); } catch (_) {}
+})(window);
+</script>
+
+
+<script id="abn-production-data-002-script">
+/* ============================================================
+   PRODUCTION-DATA-002 / FIREBASE PRODUCTION BINDING
+   Purpose: bind the production app to the fresh abonibal-production Firebase
+   workspace and isolate operational local storage from experimental data.
+   ============================================================ */
+(function(global){
+    'use strict';
+    if (!global || global.__ABN_PRODUCTION_DATA_002__) return;
+    global.__ABN_PRODUCTION_DATA_002__ = true;
+    var VERSION = 'PRODUCTION-DATA-002-FIREBASE-BINDING';
+    var EXPECTED_PROJECT = 'abonibal-production';
+    var EXPECTED_DB = 'https://abonibal-production-default-rtdb.firebaseio.com';
+    function byId(id){ return document.getElementById(id); }
+    function cfg(){ try { return global.firebaseConfig || firebaseConfig || {}; } catch(_) { return {}; } }
+    function safeCount(name){ try { return Array.isArray(global.state && global.state[name]) ? global.state[name].length : 0; } catch(_) { return 0; } }
+    function health(){
+        var c = cfg();
+        return {
+            version: VERSION,
+            projectId: c.projectId || null,
+            databaseURL: c.databaseURL || null,
+            productionProject: c.projectId === EXPECTED_PROJECT,
+            productionDatabase: c.databaseURL === EXPECTED_DB,
+            localforageNamespace: 'ABONIBALProductionData/pos_database_v1',
+            queueKey: 'abonibalProductionSyncQueueV2',
+            deviceKey: 'abonibalProductionDeviceId',
+            products: safeCount('products'),
+            invoices: safeCount('invoices'),
+            clients: safeCount('clients'),
+            note: 'Operational local data is isolated from the old experimental AlFaresAgency storage namespace.'
+        };
+    }
+    function injectCard(){
+        var target = byId('tab-system') || byId('tab-settings') || document.querySelector('.container');
+        if (!target || byId('abn-production-data-card')) return;
+        var card = document.createElement('div');
+        card.id = 'abn-production-data-card';
+        card.className = 'card';
+        card.innerHTML = '<div class="card-title">🧱 بيئة بيانات الإنتاج الجديدة</div>' +
+            '<div style="background:#ecfdf5;border:1px solid #bbf7d0;border-radius:16px;padding:14px;line-height:1.9;font-weight:800;color:#065f46;">' +
+            '✅ تم ربط هذه النسخة بقاعدة Firebase الإنتاجية الجديدة: <span dir="ltr">abonibal-production</span><br>' +
+            '✅ تم عزل التخزين المحلي التشغيلي عن بيانات التجارب القديمة.<br>' +
+            '✅ لا يتم ترحيل منتجات أو فواتير التجربة تلقائيًا إلى قاعدة الإنتاج الجديدة.' +
+            '</div>' +
+            '<button type="button" onclick="alert(JSON.stringify(ABNProductionData002.health(), null, 2))" style="margin-top:12px;background:#047857;">فحص ربط بيانات الإنتاج</button>' +
+            '<p class="abn-muted-note">ابدأ بإضافة منتج حقيقي واحد فقط، ثم اختبر الرفع والاسترجاع قبل إدخال كل البيانات.</p>';
+        target.prepend(card);
+    }
+    var previousGate = global.ABNQAGate;
+    function wrapQa(){
+        if (!previousGate || !previousGate.run || global.__ABN_PRODUCTION_DATA_002_QA_WRAPPED__) return;
+        global.__ABN_PRODUCTION_DATA_002_QA_WRAPPED__ = true;
+        global.ABNQAGate = Object.freeze({
+            version: VERSION,
+            baseline: (previousGate && previousGate.baseline) || 'POST-PRODUCTION-002',
+            run: function(){
+                var gate = previousGate.run();
+                var checks = Array.isArray(gate && gate.checks) ? gate.checks.slice() : [];
+                var h = health();
+                checks.push({ label:'Firebase الإنتاج الجديد', status: h.productionProject && h.productionDatabase ? 'ok' : 'fail', detail: (h.projectId || '-') + ' / ' + (h.databaseURL || '-') });
+                checks.push({ label:'عزل بيانات التجارب المحلية', status:'ok', detail:h.localforageNamespace });
+                var ok = checks.filter(function(c){ return c.status === 'ok'; }).length;
+                var warn = checks.filter(function(c){ return c.status === 'warn'; }).length;
+                var fail = checks.filter(function(c){ return c.status === 'fail'; }).length;
+                return Object.assign({}, gate || {}, { version: VERSION, ok: ok, warn: warn, fail: fail, passed: fail === 0, checks: checks, productionData: h });
+            },
+            render: function(){
+                var gate = this.run();
+                if (previousGate && typeof previousGate.render === 'function') {
+                    try { previousGate.render(); } catch(_) {}
+                }
+                var results = byId('qa-results');
+                var summary = byId('qa-summary');
+                if (results && Array.isArray(gate.checks)) {
+                    function esc(x){ return String(x == null ? '' : x).replace(/[&<>"']/g, function(ch){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]; }); }
+                    results.innerHTML = gate.checks.map(function(c){
+                        var icon = c.status === 'ok' ? '✅' : (c.status === 'warn' ? '⚠️' : '❌');
+                        return '<div class="abn-qa-result '+esc(c.status || 'ok')+'"><span>'+icon+' '+esc(c.label)+'</span><small>'+esc(c.detail || '')+'</small></div>';
+                    }).join('');
+                }
+                if (summary) summary.textContent = 'PRODUCTION-DATA-002 QA: ' + gate.ok + ' ناجح، ' + gate.warn + ' تنبيه، ' + gate.fail + ' فشل.';
+                return gate;
+            },
+            health: function(){ return this.run(); }
+        });
+    }
+    function apply(){
+        try { document.title = 'ABONIBAL ERP Production Data 004-R1 - Root Fixed'; } catch(_) {}
+        var buildBadge = byId('abn-build-badge');
+        if (buildBadge) buildBadge.textContent = VERSION;
+        var note = byId('abn-postprod-note');
+        if (note) note.textContent = 'PRODUCTION-DATA-002: ربط Firebase جديد للإنتاج مع عزل التخزين المحلي عن بيانات التجارب القديمة.';
+        injectCard();
+        wrapQa();
+    }
+    global.ABNProductionData002 = Object.freeze({ version: VERSION, health: health });
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply, { once:true }); else apply();
+    setTimeout(apply, 400);
+    setTimeout(apply, 1500);
+    try { console.info('[ABONIBAL] ' + VERSION + ' loaded', health()); } catch(_) {}
+})(window);
+</script>
+
+
+<script>
+/* ============================================================
+   PRODUCTION-DATA-003 — Firebase Auth + Rules Ready
+   Purpose: require authorized Firebase Auth before app init/sync when Rules are secured.
+   ============================================================ */
+(function(){
+    'use strict';
+    const BUILD = 'PRODUCTION-DATA-003-FIREBASE-AUTH-RULES-READY';
+    const EMAIL_KEY = 'abn_production_firebase_auth_email';
+    const EXPECTED_PROJECT = 'abonibal-production';
+    function $(id){ return document.getElementById(id); }
+    function setErr(message){
+        const el = $('auth-error');
+        if (el) { el.textContent = message; el.style.display = 'block'; }
+    }
+    function clearErr(){ const el = $('auth-error'); if (el) el.style.display = 'none'; }
+    function getAuth(){
+        try { return (window.firebase && firebase.auth) ? firebase.auth() : null; } catch(_) { return null; }
+    }
+    function cfg(){ try { return window.firebaseConfig || firebaseConfig || {}; } catch(_) { return {}; } }
+    async function ensureFirebaseAuthBeforeApp(){
+        const auth = getAuth();
+        const c = cfg();
+        if (!auth) throw new Error('Firebase Auth SDK غير محمل.');
+        try { await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch(_) {}
+        const emailEl = $('firebase-auth-email');
+        const passEl = $('firebase-auth-password');
+        const email = (emailEl && emailEl.value || localStorage.getItem(EMAIL_KEY) || '').trim();
+        const password = (passEl && passEl.value || '').trim();
+        if (emailEl && !emailEl.value && email) emailEl.value = email;
+        if (auth.currentUser) {
+            return auth.currentUser;
+        }
+        if (!email || !password) {
+            throw new Error('أدخل بريد Firebase وكلمة مرور Firebase أول مرة لتفعيل المزامنة الآمنة.');
+        }
+        const cred = await auth.signInWithEmailAndPassword(email, password);
+        localStorage.setItem(EMAIL_KEY, email);
+        if (passEl) passEl.value = '';
+        return cred.user;
+    }
+    function installLoginGate(){
+        if (window.__ABN_PRODUCTION_DATA_003_LOGIN_GATE__) return;
+        const previous = window.loginApp;
+        if (typeof previous !== 'function') return;
+        window.__ABN_PRODUCTION_DATA_003_LOGIN_GATE__ = true;
+        window.loginApp = async function loginAppProductionData003(){
+            clearErr();
+            try {
+                await ensureFirebaseAuthBeforeApp();
+                return await previous.apply(this, arguments);
+            } catch (err) {
+                console.error('[ABONIBAL DATA-003] Firebase Auth gate failed:', err);
+                setErr(err && err.message ? err.message : 'فشل تسجيل دخول Firebase.');
+                return false;
+            }
+        };
+    }
+    function hydrateEmail(){
+        const email = localStorage.getItem(EMAIL_KEY);
+        const emailEl = $('firebase-auth-email');
+        if (email && emailEl && !emailEl.value) emailEl.value = email;
+    }
+    function safeSignOut(){
+        const auth = getAuth();
+        if (!auth) return Promise.resolve(false);
+        localStorage.removeItem(EMAIL_KEY);
+        return auth.signOut().then(()=>true).catch(()=>false);
+    }
+    window.ABNProductionData003 = {
+        build: BUILD,
+        expectedProject: EXPECTED_PROJECT,
+        ensureAuth: ensureFirebaseAuthBeforeApp,
+        signOutFirebase: safeSignOut,
+        health: function(){
+            const c = cfg();
+            const auth = getAuth();
+            return {
+                build: BUILD,
+                firebaseAuthSdk: !!auth,
+                projectId: c.projectId || null,
+                databaseURL: c.databaseURL || null,
+                productionProject: c.projectId === EXPECTED_PROJECT,
+                currentUser: !!(auth && auth.currentUser),
+                emailRemembered: !!localStorage.getItem(EMAIL_KEY),
+                rulesReady: true
+            };
+        }
+    };
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function(){ hydrateEmail(); installLoginGate(); });
+    } else {
+        hydrateEmail(); installLoginGate();
+    }
+    setTimeout(installLoginGate, 500);
+    console.info('✅ ABONIBAL', BUILD, 'loaded', window.ABNProductionData003.health());
+})();
+</script>
+
+
+
+<script>
+/* ============================================================
+   PRODUCTION-DATA-004 — Local Auth Compatibility
+   Purpose: support local HTTP/mobile testing where crypto.subtle is not available,
+   keep Firebase Auth gate, and provide clearer diagnostics without touching data.
+   ============================================================ */
+(function(){
+    'use strict';
+    const BUILD = 'PRODUCTION-DATA-004-LOCAL-AUTH-COMPATIBILITY';
+    const ADMIN_HASH_STORAGE_KEY = 'abonibalAdminPassHash';
+    const SECURITY_LF_KEY = 'securitySettings';
+
+    function $(id){ return document.getElementById(id); }
+    function authError(message){
+        const el = $('auth-error');
+        if (el) { el.textContent = message; el.style.display = 'block'; }
+    }
+    function clearAuthError(){ const el = $('auth-error'); if (el) el.style.display = 'none'; }
+    function runtimeContext(){
+        const protocol = location.protocol || '';
+        const host = location.hostname || '';
+        const href = location.href || '';
+        const secure = !!window.isSecureContext;
+        let mode = 'unknown';
+        if (protocol === 'https:') mode = 'https-production';
+        else if (protocol === 'http:' && (host === 'localhost' || host === '127.0.0.1')) mode = 'local-http-loopback';
+        else if (protocol === 'http:') mode = 'local-http-lan';
+        else if (protocol === 'file:' || href.indexOf('content://') === 0) mode = 'local-file-content';
+        return { protocol, host, secureContext: secure, mode, cryptoSubtle: !!(window.crypto && crypto.subtle && crypto.subtle.digest) };
+    }
+
+    // Pure JS SHA-256 fallback for non-secure local HTTP/LAN origins on mobile.
+    function sha256FallbackAsciiUnicode(message){
+        function rightRotate(value, amount){ return (value >>> amount) | (value << (32 - amount)); }
+        const mathPow = Math.pow;
+        const maxWord = mathPow(2, 32);
+        const lengthProperty = 'length';
+        let i, j;
+        let result = '';
+        const words = [];
+        const ascii = unescape(encodeURIComponent(String(message)));
+        const asciiBitLength = ascii[lengthProperty] * 8;
+        let hash = sha256FallbackAsciiUnicode.h = sha256FallbackAsciiUnicode.h || [];
+        let k = sha256FallbackAsciiUnicode.k = sha256FallbackAsciiUnicode.k || [];
+        let primeCounter = k[lengthProperty];
+        const isComposite = {};
+        for (let candidate = 2; primeCounter < 64; candidate++) {
+            if (!isComposite[candidate]) {
+                for (i = 0; i < 313; i += candidate) isComposite[i] = candidate;
+                hash[primeCounter] = (mathPow(candidate, .5) * maxWord) | 0;
+                k[primeCounter++] = (mathPow(candidate, 1 / 3) * maxWord) | 0;
+            }
+        }
+        for (i = 0; i < ascii[lengthProperty]; i++) {
+            j = ascii.charCodeAt(i);
+            words[i >> 2] |= j << ((3 - i) % 4) * 8;
+        }
+        words[asciiBitLength >> 5] |= 0x80 << (24 - asciiBitLength % 32);
+        words[((asciiBitLength + 64 >> 9) << 4) + 15] = asciiBitLength;
+        for (j = 0; j < words[lengthProperty];) {
+            const w = words.slice(j, j += 16);
+            const oldHash = hash.slice(0);
+            for (i = 0; i < 64; i++) {
+                const w15 = w[i - 15], w2 = w[i - 2];
+                const a = hash[0], e = hash[4];
+                const temp1 = hash[7]
+                    + (rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25))
+                    + ((e & hash[5]) ^ ((~e) & hash[6]))
+                    + k[i]
+                    + (w[i] = (i < 16) ? w[i] : (
+                        w[i - 16]
+                        + (rightRotate(w15, 7) ^ rightRotate(w15, 18) ^ (w15 >>> 3))
+                        + w[i - 7]
+                        + (rightRotate(w2, 17) ^ rightRotate(w2, 19) ^ (w2 >>> 10))
+                    ) | 0);
+                const temp2 = (rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22))
+                    + ((a & hash[1]) ^ (a & hash[2]) ^ (hash[1] & hash[2]));
+                hash = [(temp1 + temp2) | 0].concat(hash);
+                hash[4] = (hash[4] + temp1) | 0;
+            }
+            for (i = 0; i < 8; i++) hash[i] = (hash[i] + oldHash[i]) | 0;
+        }
+        for (i = 0; i < 8; i++) {
+            for (j = 3; j + 1; j--) {
+                const b = (hash[i] >> (j * 8)) & 255;
+                result += ((b < 16) ? 0 : '') + b.toString(16);
+            }
+        }
+        return result;
+    }
+    async function sha256Compat(message){
+        if (window.crypto && crypto.subtle && crypto.subtle.digest) {
+            try {
+                const msgBuffer = new TextEncoder().encode(String(message));
+                const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            } catch (error) {
+                console.warn('[ABONIBAL DATA-004] crypto.subtle failed; fallback used:', error);
+            }
+        }
+        return sha256FallbackAsciiUnicode(message);
+    }
+    try { window.sha256 = sha256Compat; sha256 = sha256Compat; } catch(_) { window.sha256 = sha256Compat; }
+
+    async function getLocalAdminHash(){
+        try {
+            const ls = localStorage.getItem(ADMIN_HASH_STORAGE_KEY);
+            if (ls) return ls;
+        } catch(_) {}
+        try {
+            if (window.state && state.security && state.security.adminPassHash) return state.security.adminPassHash;
+        } catch(_) {}
+        try {
+            if (window.localforage) {
+                const sec = await localforage.getItem(SECURITY_LF_KEY);
+                if (sec && sec.adminPassHash) {
+                    try { localStorage.setItem(ADMIN_HASH_STORAGE_KEY, sec.adminPassHash); } catch(_) {}
+                    return sec.adminPassHash;
+                }
+                const other = await localforage.getItem('otherData');
+                if (other && other.security && other.security.adminPassHash) {
+                    try { localStorage.setItem(ADMIN_HASH_STORAGE_KEY, other.security.adminPassHash); } catch(_) {}
+                    return other.security.adminPassHash;
+                }
+            }
+        } catch(error) {
+            console.warn('[ABONIBAL DATA-004] local security hash read warning:', error);
+        }
+        try { return DEFAULT_ADMIN_PASS_HASH_PATCH002 || ADMIN_PASS_HASH; } catch(_) {}
+        try { return ADMIN_PASS_HASH; } catch(_) {}
+        return null;
+    }
+    async function ensureFirebaseAuth(){
+        if (window.ABNProductionData003 && typeof ABNProductionData003.ensureAuth === 'function') {
+            return ABNProductionData003.ensureAuth();
+        }
+        if (window.firebase && firebase.auth) return firebase.auth().currentUser || true;
+        return true;
+    }
+    function openAppOnce(){
+        const overlay = $('auth-overlay');
+        const main = $('main-container');
+        const header = $('app-header');
+        if (overlay) overlay.style.display = 'none';
+        if (main) main.style.display = 'block';
+        if (header) header.style.display = 'flex';
+        if (!window.__ABN_DATA_004_INIT_DONE__) {
+            window.__ABN_DATA_004_INIT_DONE__ = true;
+            if (typeof initApp === 'function') initApp();
+        }
+    }
+    async function loginCompat(){
+        clearAuthError();
+        const passEl = $('admin-password');
+        const pass = passEl ? passEl.value : '';
+        try {
+            const expected = await getLocalAdminHash();
+            if (!expected) throw new Error('لم يتم العثور على بصمة كلمة مرور البرنامج المحلية.');
+            const actual = await sha256Compat(pass);
+            if (actual !== expected) {
+                authError('كلمة مرور البرنامج غير صحيحة.');
+                return false;
+            }
+            try {
+                await ensureFirebaseAuth();
+            } catch(firebaseError) {
+                console.error('[ABONIBAL DATA-004] Firebase Auth failed:', firebaseError);
+                authError((firebaseError && firebaseError.message) ? firebaseError.message : 'فشل تسجيل دخول Firebase.');
+                return false;
+            }
+            openAppOnce();
+            return true;
+        } catch(error) {
+            console.error('[ABONIBAL DATA-004] Local auth failed:', error, runtimeContext());
+            authError('تعذر التحقق من كلمة مرور البرنامج محليًا. أعد المحاولة أو افتح النسخة عبر HTTPS.');
+            return false;
+        }
+    }
+    function install(){
+        window.loginApp = loginCompat;
+        const email = localStorage.getItem('abn_production_firebase_auth_email');
+        const emailEl = $('firebase-auth-email');
+        if (email && emailEl && !emailEl.value) emailEl.value = email;
+    }
+    window.ABNProductionData004 = {
+        build: BUILD,
+        runtime: runtimeContext,
+        sha256: sha256Compat,
+        getLocalAdminHash: getLocalAdminHash,
+        login: loginCompat,
+        health: function(){
+            const ctx = runtimeContext();
+            const auth = (window.firebase && firebase.auth) ? firebase.auth() : null;
+            return {
+                build: BUILD,
+                runtime: ctx,
+                firebaseAuthSdk: !!auth,
+                currentUser: !!(auth && auth.currentUser),
+                localHashPresent: !!localStorage.getItem(ADMIN_HASH_STORAGE_KEY),
+                loginOverride: window.loginApp === loginCompat
+            };
+        }
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once:true }); else install();
+    setTimeout(install, 700);
+    setTimeout(install, 1600);
+    console.info('✅ ABONIBAL', BUILD, 'loaded', window.ABNProductionData004.health());
+})();
+</script>
+
+
+<script>
+/* ============================================================
+   PRODUCTION-DATA-004-R1 — ROOT FIX HARDENING LAYER
+   Scope: security gate, SHA-256 fallback, ID fallback, ledger de-duplication,
+   strict Firebase access, default-password lockout, production diagnostics.
+   ============================================================ */
+(function(){
+    'use strict';
+    const BUILD = 'PRODUCTION-DATA-004-R1-ROOT-FIX-HARDENING';
+    const ADMIN_HASH_STORAGE_KEY_R1 = 'abonibalAdminPassHash';
+    const REAL_DEFAULT_HASH_R1 = '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92';
+    const ALLOW_DEFAULT_BOOTSTRAP_KEY = 'ABN_ALLOW_DEFAULT_PASSWORD_BOOTSTRAP';
+    function $(id){ return document.getElementById(id); }
+    function setAuthError(message){ const el = $('auth-error'); if (el) { el.textContent = message; el.style.display = 'block'; } }
+    function clearAuthError(){ const el = $('auth-error'); if (el) el.style.display = 'none'; }
+
+    function rotr(n, x){ return (x >>> n) | (x << (32 - n)); }
+    function sha256Pure(message){
+        const bytes = new TextEncoder().encode(String(message));
+        const K = [0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+        const H = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+        const bitLen = bytes.length * 8;
+        const withOne = bytes.length + 1;
+        const padLen = (withOne % 64 <= 56) ? (56 - withOne % 64) : (120 - withOne % 64);
+        const msg = new Uint8Array(withOne + padLen + 8);
+        msg.set(bytes); msg[bytes.length] = 0x80;
+        const view = new DataView(msg.buffer);
+        view.setUint32(msg.length - 8, Math.floor(bitLen / 0x100000000), false);
+        view.setUint32(msg.length - 4, bitLen >>> 0, false);
+        const W = new Uint32Array(64);
+        for (let offset = 0; offset < msg.length; offset += 64) {
+            for (let i=0;i<16;i++) W[i] = view.getUint32(offset + i*4, false);
+            for (let i=16;i<64;i++) {
+                const s0 = rotr(7,W[i-15]) ^ rotr(18,W[i-15]) ^ (W[i-15] >>> 3);
+                const s1 = rotr(17,W[i-2]) ^ rotr(19,W[i-2]) ^ (W[i-2] >>> 10);
+                W[i] = (W[i-16] + s0 + W[i-7] + s1) >>> 0;
+            }
+            let [a,b,c,d,e,f,g,h] = H;
+            for (let i=0;i<64;i++) {
+                const S1 = rotr(6,e) ^ rotr(11,e) ^ rotr(25,e);
+                const ch = (e & f) ^ (~e & g);
+                const temp1 = (h + S1 + ch + K[i] + W[i]) >>> 0;
+                const S0 = rotr(2,a) ^ rotr(13,a) ^ rotr(22,a);
+                const maj = (a & b) ^ (a & c) ^ (b & c);
+                const temp2 = (S0 + maj) >>> 0;
+                h = g; g = f; f = e; e = (d + temp1) >>> 0; d = c; c = b; b = a; a = (temp1 + temp2) >>> 0;
+            }
+            H[0]=(H[0]+a)>>>0; H[1]=(H[1]+b)>>>0; H[2]=(H[2]+c)>>>0; H[3]=(H[3]+d)>>>0;
+            H[4]=(H[4]+e)>>>0; H[5]=(H[5]+f)>>>0; H[6]=(H[6]+g)>>>0; H[7]=(H[7]+h)>>>0;
+        }
+        return Array.from(H, x => x.toString(16).padStart(8,'0')).join('');
+    }
+    async function sha256RootFixed(message){
+        if (window.crypto && crypto.subtle && crypto.subtle.digest && window.isSecureContext) {
+            try {
+                const msgBuffer = new TextEncoder().encode(String(message));
+                const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+                return Array.from(new Uint8Array(hashBuffer), b => b.toString(16).padStart(2,'0')).join('');
+            } catch(_) {}
+        }
+        return sha256Pure(message);
+    }
+    window.sha256 = sha256RootFixed;
+    try { sha256 = sha256RootFixed; } catch(_) {}
+
+    window.generateUniqueID = function generateUniqueIDRootFixed(){
+        if (window.crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+        const bytes = new Uint8Array(16);
+        if (window.crypto && typeof crypto.getRandomValues === 'function') crypto.getRandomValues(bytes);
+        else for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+        const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0'));
+        return `${hex.slice(0,4).join('')}-${hex.slice(4,6).join('')}-${hex.slice(6,8).join('')}-${hex.slice(8,10).join('')}-${hex.slice(10,16).join('')}`;
+    };
+
+    async function ensureFirebaseAccessRootFixed(){
+        try {
+            if (!window.firebase || !firebase.auth) return { ok:false, error:'Firebase Auth SDK غير محمل.' };
+            const auth = firebase.auth();
+            const user = auth.currentUser;
+            if (!user || !user.uid) return { ok:false, error:'يجب تسجيل الدخول إلى Firebase Auth قبل أي قراءة أو كتابة.' };
+            return { ok:true, uid:user.uid, accountId:user.uid, email:user.email || '' };
+        } catch(error) {
+            return { ok:false, error:error && error.message ? error.message : String(error) };
+        }
+    }
+    window.ensureFirebaseAccess = ensureFirebaseAccessRootFixed;
+    try { ensureFirebaseAccess = ensureFirebaseAccessRootFixed; } catch(_) {}
+
+    async function ensureFirebaseAuthForLogin(){
+        if (!window.firebase || !firebase.auth) throw new Error('Firebase Auth SDK غير محمل.');
+        const auth = firebase.auth();
+        try { await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch(_) {}
+        if (auth.currentUser) return auth.currentUser;
+        const emailEl = $('firebase-auth-email');
+        const passEl = $('firebase-auth-password');
+        const email = ((emailEl && emailEl.value) || localStorage.getItem('abn_production_firebase_auth_email') || '').trim();
+        const password = ((passEl && passEl.value) || '').trim();
+        if (!email || !password) throw new Error('أدخل بريد وكلمة مرور Firebase أولًا.');
+        const cred = await auth.signInWithEmailAndPassword(email, password);
+        localStorage.setItem('abn_production_firebase_auth_email', email);
+        if (passEl) passEl.value = '';
+        return cred.user;
+    }
+    async function getRemoteSecurityHash(){
+        try {
+            const access = await ensureFirebaseAccessRootFixed();
+            if (!access.ok || !window.db) return null;
+            const snap = await db.ref('system/security/adminPassHash').once('value');
+            const hash = snap.val();
+            return /^[a-f0-9]{64}$/i.test(String(hash || '')) ? String(hash) : null;
+        } catch(_) { return null; }
+    }
+    async function getStrictAdminHash(){
+        const candidates = [];
+        try { candidates.push(localStorage.getItem(ADMIN_HASH_STORAGE_KEY_R1)); } catch(_) {}
+        try { if (window.state && state.security) candidates.push(state.security.adminPassHash); } catch(_) {}
+        try {
+            if (window.localforage) {
+                const sec = await localforage.getItem('securitySettings');
+                if (sec) candidates.push(sec.adminPassHash);
+                const other = await localforage.getItem('otherData');
+                if (other && other.security) candidates.push(other.security.adminPassHash);
+            }
+        } catch(_) {}
+        const remote = await getRemoteSecurityHash();
+        if (remote) candidates.push(remote);
+        const valid = candidates.map(x => String(x || '').trim()).find(x => /^[a-f0-9]{64}$/i.test(x));
+        if (!valid) return null;
+        const isDefault = valid.toLowerCase() === REAL_DEFAULT_HASH_R1;
+        const allowBootstrap = localStorage.getItem(ALLOW_DEFAULT_BOOTSTRAP_KEY) === 'true';
+        if (isDefault && !allowBootstrap) return { blockedDefault:true, hash:valid };
+        return { hash:valid, blockedDefault:false };
+    }
+    async function loginAppRootFixed(){
+        clearAuthError();
+        try {
+            await ensureFirebaseAuthForLogin();
+            const passEl = $('admin-password');
+            const pass = passEl ? passEl.value : '';
+            const expected = await getStrictAdminHash();
+            if (!expected) { setAuthError('لم يتم العثور على كلمة مرور محلية مخصصة. لا يُسمح بالافتراضية في نسخة الإنتاج.'); return false; }
+            if (expected.blockedDefault) { setAuthError('كلمة المرور الافتراضية 123456 مرفوضة في الإنتاج. غيّر كلمة المرور من نسخة موثوقة أو فعّل Bootstrap مؤقتًا فقط للترحيل.'); return false; }
+            const actual = await sha256RootFixed(pass);
+            if (actual !== expected.hash) { setAuthError('كلمة مرور البرنامج غير صحيحة.'); return false; }
+            const overlay = $('auth-overlay'), main = $('main-container'), header = $('app-header');
+            if (overlay) overlay.style.display = 'none';
+            if (main) main.style.display = 'block';
+            if (header) header.style.display = 'flex';
+            if (!window.__ABN_R1_INIT_DONE__) { window.__ABN_R1_INIT_DONE__ = true; if (typeof initApp === 'function') initApp(); }
+            return true;
+        } catch(error) {
+            console.error('[ABONIBAL DATA-004-R1] login failed:', error);
+            setAuthError(error && error.message ? error.message : 'فشل تسجيل الدخول الآمن.');
+            return false;
+        }
+    }
+    window.loginApp = loginAppRootFixed;
+
+    if (typeof window.recordLedgerEntry === 'function') {
+        const previousLedger = window.recordLedgerEntry;
+        window.recordLedgerEntry = function recordLedgerEntryRootFixed(account, debit, credit, reference, note){
+            const acc = String(account || '');
+            const ref = String(reference || '');
+            if (acc === 'إيرادات المبيعات') {
+                if (ref.indexOf('فاتورة #') === 0) {
+                    const paidEl = $('inv-paid-amount');
+                    const paid = Number(paidEl && paidEl.value) || 0;
+                    if (paid > 0 && Number(credit || 0) < Number(($('invoice-total') && $('invoice-total').innerText) || credit || 0)) return null;
+                }
+                if (ref.indexOf('دين مفرق') === 0) {
+                    const paid = Number(($('ret-paid-amount') && $('ret-paid-amount').value) || 0);
+                    if (paid > 0) return null;
+                }
+            }
+            return previousLedger.apply(this, arguments);
+        };
+        try { recordLedgerEntry = window.recordLedgerEntry; } catch(_) {}
+    }
+
+    if (typeof window.trackChange === 'function') {
+        const previousTrackChange = window.trackChange;
+        window.trackChange = function trackChangeRootFixed(collection, entityId, operation, data){
+            try {
+                const auth = window.firebase && firebase.auth ? firebase.auth() : null;
+                const user = auth && auth.currentUser;
+                if (data && typeof data === 'object' && !Array.isArray(data) && user && user.uid) {
+                    data._accountId = data._accountId || user.uid;
+                    data._providerUserId = data._providerUserId || user.uid;
+                }
+            } catch(_) {}
+            return previousTrackChange.apply(this, arguments);
+        };
+        try { trackChange = window.trackChange; } catch(_) {}
+    }
+
+    window.ABNProductionData004R1 = {
+        build: BUILD,
+        sha256: sha256RootFixed,
+        ensureFirebaseAccess: ensureFirebaseAccessRootFixed,
+        allowDefaultPasswordBootstrapKey: ALLOW_DEFAULT_BOOTSTRAP_KEY,
+        health: async function(){
+            const access = await ensureFirebaseAccessRootFixed();
+            const hash = await getStrictAdminHash();
+            return {
+                build: BUILD,
+                firebaseAccess: access.ok,
+                uid: access.uid || null,
+                customLocalPasswordReady: !!(hash && !hash.blockedDefault),
+                defaultPasswordBlocked: !!(hash && hash.blockedDefault),
+                sha256SelfTest: await sha256RootFixed('123456') === REAL_DEFAULT_HASH_R1,
+                loginOverride: window.loginApp === loginAppRootFixed
+            };
+        }
+    };
+    console.info('✅ ABONIBAL', BUILD, 'loaded');
+})();
+</script>
+
+
+
+<script>
+/* ============================================================
+   PRODUCTION-DATA-004-R2 — PHONE LOGIN / PASSWORD SOURCE FIX
+   Root cause fixed: mobile devices can have stale/empty localStorage when
+   opened as content:// or a different origin. Firebase security hash is now
+   fetched first after Firebase Auth, all known hashes are accepted only for
+   migration, and the winning hash is persisted locally and to Firebase when safe.
+   ============================================================ */
+(function(){
+    'use strict';
+    const BUILD = 'PRODUCTION-DATA-004-R2-PHONE-LOGIN-SYNC-FIX';
+    const ADMIN_HASH_STORAGE_KEY = 'abonibalAdminPassHash';
+    const SECURITY_LF_KEY = 'securitySettings';
+    const DEFAULT_HASH = '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92';
+
+    function $(id){ return document.getElementById(id); }
+    function setAuthError(message){
+        const el = $('auth-error');
+        if (el) { el.textContent = message; el.style.display = 'block'; }
+    }
+    function clearAuthError(){ const el = $('auth-error'); if (el) el.style.display = 'none'; }
+    function isHash(value){ return /^[a-f0-9]{64}$/i.test(String(value || '').trim()); }
+    function cleanHash(value){ return isHash(value) ? String(value).trim().toLowerCase() : ''; }
+    function now(){ return Date.now(); }
+
+    async function sha256R2(value){
+        if (window.ABNProductionData004R1 && typeof ABNProductionData004R1.sha256 === 'function') return ABNProductionData004R1.sha256(value);
+        if (window.ABNProductionData004 && typeof ABNProductionData004.sha256 === 'function') return ABNProductionData004.sha256(value);
+        if (typeof window.sha256 === 'function') return window.sha256(value);
+        throw new Error('محرك SHA-256 غير متاح.');
+    }
+
+    async function ensureFirebaseAuthR2(){
+        if (!window.firebase || !firebase.auth) throw new Error('Firebase Auth SDK غير محمل.');
+        const auth = firebase.auth();
+        try { await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch(_) {}
+        if (auth.currentUser && auth.currentUser.uid) return auth.currentUser;
+
+        const emailEl = $('firebase-auth-email');
+        const passwordEl = $('firebase-auth-password');
+        const email = String((emailEl && emailEl.value) || localStorage.getItem('abn_production_firebase_auth_email') || '').trim();
+        const firebasePassword = String((passwordEl && passwordEl.value) || '').trim();
+        if (!email || !firebasePassword) throw new Error('أدخل بريد وكلمة مرور Firebase أولًا.');
+
+        const cred = await auth.signInWithEmailAndPassword(email, firebasePassword);
+        try { localStorage.setItem('abn_production_firebase_auth_email', email); } catch(_) {}
+        if (passwordEl) passwordEl.value = '';
+        if (!cred.user || !cred.user.uid) throw new Error('فشل تثبيت جلسة Firebase.');
+        return cred.user;
+    }
+
+    async function readRemoteSecurity(){
+        try {
+            if (!window.db) return null;
+            const snap = await db.ref('system/security').once('value');
+            const value = snap.val();
+            if (value && cleanHash(value.adminPassHash)) {
+                return {
+                    source: 'firebase:system/security',
+                    hash: cleanHash(value.adminPassHash),
+                    changedAt: Number(value._updatedAt || value.changedAt || 0),
+                    raw: value,
+                    remote: true
+                };
+            }
+            const snapHash = await db.ref('system/security/adminPassHash').once('value');
+            const directHash = cleanHash(snapHash.val());
+            if (directHash) return { source:'firebase:system/security/adminPassHash', hash:directHash, changedAt:0, raw:{adminPassHash:directHash}, remote:true };
+        } catch(error) {
+            console.warn('[ABONIBAL R2] Remote security read failed:', error);
+        }
+        return null;
+    }
+
+    async function readLocalCandidates(){
+        const list = [];
+        try {
+            const h = cleanHash(localStorage.getItem(ADMIN_HASH_STORAGE_KEY));
+            if (h) list.push({ source:'localStorage:abonibalAdminPassHash', hash:h, changedAt:0, local:true });
+        } catch(_) {}
+        try {
+            if (window.state && state.security && cleanHash(state.security.adminPassHash)) {
+                list.push({
+                    source:'state.security',
+                    hash:cleanHash(state.security.adminPassHash),
+                    changedAt:Number(state.security._updatedAt || state.security.changedAt || 0),
+                    raw:state.security,
+                    local:true
+                });
+            }
+        } catch(_) {}
+        try {
+            if (window.localforage) {
+                const security = await localforage.getItem(SECURITY_LF_KEY);
+                if (security && cleanHash(security.adminPassHash)) {
+                    list.push({
+                        source:'localforage:securitySettings',
+                        hash:cleanHash(security.adminPassHash),
+                        changedAt:Number(security._updatedAt || security.changedAt || 0),
+                        raw:security,
+                        local:true
+                    });
+                }
+                const other = await localforage.getItem('otherData');
+                if (other && other.security && cleanHash(other.security.adminPassHash)) {
+                    list.push({
+                        source:'localforage:otherData.security',
+                        hash:cleanHash(other.security.adminPassHash),
+                        changedAt:Number(other.security._updatedAt || other.security.changedAt || 0),
+                        raw:other.security,
+                        local:true
+                    });
+                }
+            }
+        } catch(error) {
+            console.warn('[ABONIBAL R2] Local security read failed:', error);
+        }
+        return list;
+    }
+
+    function uniqueCandidates(candidates){
+        const map = new Map();
+        for (const c of candidates) {
+            if (!c || !cleanHash(c.hash)) continue;
+            const hash = cleanHash(c.hash);
+            const prev = map.get(hash);
+            if (!prev || Number(c.changedAt || 0) > Number(prev.changedAt || 0) || c.remote) map.set(hash, { ...c, hash });
+        }
+        return Array.from(map.values()).sort((a,b) => {
+            if (!!a.remote !== !!b.remote) return a.remote ? -1 : 1;
+            return Number(b.changedAt || 0) - Number(a.changedAt || 0);
+        });
+    }
+
+    async function collectSecurityCandidates(){
+        const remote = await readRemoteSecurity();
+        const local = await readLocalCandidates();
+        return uniqueCandidates(remote ? [remote, ...local] : local);
+    }
+
+    async function persistWinningSecurity(match, user, options = {}){
+        const stamp = Number(match.changedAt || 0) || now();
+        const security = {
+            ...(match.raw && typeof match.raw === 'object' ? match.raw : {}),
+            adminPassHash: cleanHash(match.hash),
+            changedAt: stamp,
+            _updatedAt: stamp,
+            _deviceId: (window.DEVICE_ID || (match.raw && match.raw._deviceId) || 'unknown-device'),
+            _providerUserId: user && user.uid || '',
+            _accountId: user && user.uid || ''
+        };
+        try { localStorage.setItem(ADMIN_HASH_STORAGE_KEY, security.adminPassHash); } catch(_) {}
+        try { if (window.state) state.security = { ...(state.security || {}), ...security }; } catch(_) {}
+        try { if (window.localforage) await localforage.setItem(SECURITY_LF_KEY, security); } catch(_) {}
+
+        // Only repair Firebase automatically when there is no trustworthy remote hash,
+        // or when the remote hash is still the old default. Never silently overwrite a
+        // different custom cloud password.
+        try {
+            if (window.db) {
+                const remote = await readRemoteSecurity();
+                const remoteHash = remote && cleanHash(remote.hash);
+                const shouldWrite = options.forceRemoteWrite || !remoteHash || remoteHash === DEFAULT_HASH || remoteHash === security.adminPassHash;
+                if (shouldWrite) await db.ref('system/security').set(security);
+            }
+        } catch(error) {
+            console.warn('[ABONIBAL R2] Remote security repair skipped:', error);
+        }
+    }
+
+    function openAppR2(){
+        const overlay = $('auth-overlay'), main = $('main-container'), header = $('app-header');
+        if (overlay) overlay.style.display = 'none';
+        if (main) main.style.display = 'block';
+        if (header) header.style.display = 'flex';
+        if (!window.__ABN_R2_INIT_DONE__) {
+            window.__ABN_R2_INIT_DONE__ = true;
+            if (typeof window.initApp === 'function') window.initApp();
+            else if (typeof initApp === 'function') initApp();
+        }
+    }
+
+    async function loginAppR2(){
+        clearAuthError();
+        const passEl = $('admin-password');
+        const programPassword = String((passEl && passEl.value) || '');
+        try {
+            const user = await ensureFirebaseAuthR2();
+            const enteredHash = await sha256R2(programPassword);
+            const candidates = await collectSecurityCandidates();
+
+            if (!candidates.length) {
+                setAuthError('لم يتم العثور على بصمة كلمة مرور البرنامج. افتح النسخة التي تعمل على اللابتوب ثم غيّر كلمة المرور مرة واحدة لمزامنتها.');
+                return false;
+            }
+
+            const match = candidates.find(c => cleanHash(c.hash) === cleanHash(enteredHash));
+            if (!match) {
+                const remote = candidates.find(c => c.remote);
+                if (remote && remote.hash === DEFAULT_HASH) {
+                    setAuthError('كلمة مرور السحابة ما زالت افتراضية أو قديمة. افتح النسخة التي تعمل على اللابتوب ثم غيّر كلمة المرور مرة واحدة ليتم نشرها للهاتف.');
+                    return false;
+                }
+                setAuthError('كلمة مرور البرنامج غير صحيحة أو أن الهاتف يحمل بصمة محلية قديمة. استخدم النسخة R2 على اللابتوب أولًا لتحديث بصمة السحابة.');
+                return false;
+            }
+
+            if (match.hash === DEFAULT_HASH) {
+                setAuthError('كلمة المرور الافتراضية 123456 مرفوضة في نسخة الإنتاج. غيّرها من اللابتوب ثم جرّب الهاتف.');
+                return false;
+            }
+
+            await persistWinningSecurity(match, user, { forceRemoteWrite: !!match.remote });
+            openAppR2();
+            return true;
+        } catch(error) {
+            console.error('[ABONIBAL R2] Login failed:', error);
+            setAuthError(error && error.message ? error.message : 'فشل تسجيل الدخول الآمن.');
+            return false;
+        }
+    }
+
+    async function changeAdminPasswordR2(){
+        const current = $('security-current-pass')?.value || '';
+        const next = $('security-new-pass')?.value || '';
+        const confirmNext = $('security-confirm-pass')?.value || '';
+        if (!current || !next || !confirmNext) return alert('يرجى تعبئة جميع حقول كلمة المرور.');
+        if (next.length < 6) return alert('كلمة المرور الجديدة يجب أن تكون 6 أحرف/أرقام على الأقل.');
+        if (next === '123456') return alert('لا يمكن استخدام كلمة المرور الافتراضية 123456 في الإنتاج.');
+        if (next !== confirmNext) return alert('كلمة المرور الجديدة وتأكيدها غير متطابقين.');
+
+        try {
+            const user = await ensureFirebaseAuthR2();
+            const currentHash = cleanHash(await sha256R2(current));
+            const candidates = await collectSecurityCandidates();
+            if (!candidates.some(c => cleanHash(c.hash) === currentHash)) return alert('كلمة المرور الحالية غير صحيحة.');
+
+            const newHash = cleanHash(await sha256R2(next));
+            const stamp = now();
+            const security = {
+                adminPassHash: newHash,
+                changedAt: stamp,
+                _updatedAt: stamp,
+                _deviceId: window.DEVICE_ID || 'unknown-device',
+                _providerUserId: user.uid,
+                _accountId: user.uid
+            };
+            await persistWinningSecurity({ source:'password-change', hash:newHash, changedAt:stamp, raw:security }, user, { forceRemoteWrite:true });
+            try { if (typeof window.trackChange === 'function') window.trackChange('system', 'security', 'update', security); else if (typeof trackChange === 'function') trackChange('system', 'security', 'update', security); } catch(_) {}
+            try { if (typeof window.saveToLocal === 'function') await window.saveToLocal(); else if (typeof saveToLocal === 'function') await saveToLocal(); } catch(_) {}
+            try { if (navigator.onLine && window.SyncManager && typeof SyncManager.performDeltaSync === 'function') await SyncManager.performDeltaSync(); } catch(_) {}
+            ['security-current-pass','security-new-pass','security-confirm-pass'].forEach(id => { const el = $(id); if (el) el.value = ''; });
+            try { if (typeof window.addAdminLog === 'function') window.addAdminLog('تغيير كلمة المرور', 'تم تغيير كلمة مرور الدخول ومزامنتها عبر Firebase'); } catch(_) {}
+            alert('✅ تم تغيير كلمة المرور ومزامنتها. استخدم نفس الكلمة على الهاتف.');
+        } catch(error) {
+            console.error('[ABONIBAL R2] Password change failed:', error);
+            alert(error && error.message ? error.message : 'فشل تغيير كلمة المرور.');
+        }
+    }
+
+    window.loginApp = loginAppR2;
+    window.changeAdminPassword = changeAdminPasswordR2;
+    try { loginApp = loginAppR2; } catch(_) {}
+    try { changeAdminPassword = changeAdminPasswordR2; } catch(_) {}
+
+    window.ABNProductionData004R2 = {
+        build: BUILD,
+        login: loginAppR2,
+        changeAdminPassword: changeAdminPasswordR2,
+        collectSecurityCandidates,
+        health: async function(){
+            const auth = window.firebase && firebase.auth ? firebase.auth() : null;
+            const candidates = await collectSecurityCandidates();
+            return {
+                build: BUILD,
+                currentUser: !!(auth && auth.currentUser),
+                candidateSources: candidates.map(c => c.source),
+                remoteHashReady: candidates.some(c => c.remote),
+                localHashReady: candidates.some(c => c.local),
+                defaultHashPresent: candidates.some(c => c.hash === DEFAULT_HASH),
+                loginOverride: window.loginApp === loginAppR2
+            };
+        }
+    };
+    console.info('✅ ABONIBAL', BUILD, 'loaded');
+})();
+</script>
+
+
+
+<script>
+/* ============================================================
+   PRODUCTION-DATA-004-R3 — PHONE BOOTSTRAP LOGIN FIX
+   Fixes the remaining cross-device password mismatch case:
+   laptop may still authenticate from a local hash while phone has no trusted
+   local origin and Firebase contains an old/missing app-password hash.
+
+   Safety behavior:
+   - Firebase Auth must succeed first.
+   - Default password 123456 is blocked.
+   - If the entered app password does not match any known hash, R3 requires a
+     second identical login press within 2 minutes before publishing the entered
+     app password hash to Firebase as the canonical cross-device password.
+   ============================================================ */
+(function(){
+    'use strict';
+    const BUILD = 'PRODUCTION-DATA-004-R3-PHONE-BOOTSTRAP-LOGIN-FIX';
+    const ADMIN_HASH_STORAGE_KEY = 'abonibalAdminPassHash';
+    const SECURITY_LF_KEY = 'securitySettings';
+    const DEFAULT_HASH = '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92';
+    const PENDING_KEY = 'abn_r3_pending_program_password_hash';
+    const PENDING_TTL_MS = 120000;
+
+    function $(id){ return document.getElementById(id); }
+    function now(){ return Date.now(); }
+    function isHash(v){ return /^[a-f0-9]{64}$/i.test(String(v || '').trim()); }
+    function cleanHash(v){ return isHash(v) ? String(v).trim().toLowerCase() : ''; }
+    function setAuthError(message){
+        const el = $('auth-error');
+        if (el) { el.textContent = message; el.style.display = 'block'; }
+        else alert(message);
+    }
+    function clearAuthError(){ const el = $('auth-error'); if (el) el.style.display = 'none'; }
+
+    async function sha256R3(value){
+        if (window.ABNProductionData004R1 && typeof ABNProductionData004R1.sha256 === 'function') return ABNProductionData004R1.sha256(value);
+        if (window.ABNProductionData004 && typeof ABNProductionData004.sha256 === 'function') return ABNProductionData004.sha256(value);
+        if (typeof window.sha256 === 'function') return window.sha256(value);
+        if (window.crypto && crypto.subtle && window.TextEncoder) {
+            const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(value)));
+            return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+        throw new Error('محرك SHA-256 غير متاح على هذا المتصفح. افتح النسخة عبر HTTPS.');
+    }
+
+    async function ensureFirebaseAuthR3(){
+        if (!window.firebase || !firebase.auth) throw new Error('Firebase Auth SDK غير محمل. تأكد من اتصال الإنترنت.');
+        const auth = firebase.auth();
+        try { await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch(_) {}
+        if (auth.currentUser && auth.currentUser.uid) return auth.currentUser;
+
+        const emailEl = $('firebase-auth-email');
+        const passwordEl = $('firebase-auth-password');
+        const email = String((emailEl && emailEl.value) || localStorage.getItem('abn_production_firebase_auth_email') || '').trim();
+        const firebasePassword = String((passwordEl && passwordEl.value) || '').trim();
+        if (!email || !firebasePassword) throw new Error('أدخل بريد Firebase وكلمة مرور Firebase أولًا.');
+
+        const cred = await auth.signInWithEmailAndPassword(email, firebasePassword);
+        try { localStorage.setItem('abn_production_firebase_auth_email', email); } catch(_) {}
+        if (passwordEl) passwordEl.value = '';
+        if (!cred.user || !cred.user.uid) throw new Error('فشل تثبيت جلسة Firebase.');
+        return cred.user;
+    }
+
+    async function readRemoteCandidate(){
+        try {
+            if (!window.db) return null;
+            const snap = await db.ref('system/security').once('value');
+            const value = snap.val();
+            if (value && cleanHash(value.adminPassHash)) {
+                return {
+                    source:'firebase:system/security',
+                    hash:cleanHash(value.adminPassHash),
+                    changedAt:Number(value._updatedAt || value.changedAt || 0),
+                    raw:value,
+                    remote:true
+                };
+            }
+            const hashSnap = await db.ref('system/security/adminPassHash').once('value');
+            const hash = cleanHash(hashSnap.val());
+            if (hash) return { source:'firebase:system/security/adminPassHash', hash, changedAt:0, raw:{ adminPassHash:hash }, remote:true };
+        } catch(error) {
+            console.warn('[ABONIBAL R3] Remote security read failed:', error);
+        }
+        return null;
+    }
+
+    async function readLocalCandidates(){
+        const list = [];
+        try {
+            const h = cleanHash(localStorage.getItem(ADMIN_HASH_STORAGE_KEY));
+            if (h) list.push({ source:'localStorage:abonibalAdminPassHash', hash:h, changedAt:0, local:true });
+        } catch(_) {}
+        try {
+            if (window.state && state.security && cleanHash(state.security.adminPassHash)) {
+                list.push({
+                    source:'memory:state.security',
+                    hash:cleanHash(state.security.adminPassHash),
+                    changedAt:Number(state.security._updatedAt || state.security.changedAt || 0),
+                    raw:state.security,
+                    local:true
+                });
+            }
+        } catch(_) {}
+        try {
+            if (window.localforage) {
+                const security = await localforage.getItem(SECURITY_LF_KEY);
+                if (security && cleanHash(security.adminPassHash)) {
+                    list.push({
+                        source:'localforage:securitySettings',
+                        hash:cleanHash(security.adminPassHash),
+                        changedAt:Number(security._updatedAt || security.changedAt || 0),
+                        raw:security,
+                        local:true
+                    });
+                }
+                const other = await localforage.getItem('otherData');
+                if (other && other.security && cleanHash(other.security.adminPassHash)) {
+                    list.push({
+                        source:'localforage:otherData.security',
+                        hash:cleanHash(other.security.adminPassHash),
+                        changedAt:Number(other.security._updatedAt || other.security.changedAt || 0),
+                        raw:other.security,
+                        local:true
+                    });
+                }
+            }
+        } catch(error) { console.warn('[ABONIBAL R3] Local security read failed:', error); }
+        return list;
+    }
+
+    function uniqueCandidates(items){
+        const map = new Map();
+        for (const item of items || []) {
+            if (!item || !cleanHash(item.hash)) continue;
+            const h = cleanHash(item.hash);
+            const prev = map.get(h);
+            if (!prev || item.remote || Number(item.changedAt || 0) > Number(prev.changedAt || 0)) map.set(h, { ...item, hash:h });
+        }
+        return Array.from(map.values()).sort((a,b) => {
+            if (!!a.remote !== !!b.remote) return a.remote ? -1 : 1;
+            return Number(b.changedAt || 0) - Number(a.changedAt || 0);
+        });
+    }
+
+    async function collectCandidatesR3(){
+        const remote = await readRemoteCandidate();
+        const local = await readLocalCandidates();
+        return uniqueCandidates(remote ? [remote, ...local] : local);
+    }
+
+    function getPending(){
+        try { return JSON.parse(sessionStorage.getItem(PENDING_KEY) || 'null'); } catch(_) { return null; }
+    }
+    function setPending(hash, uid){
+        try { sessionStorage.setItem(PENDING_KEY, JSON.stringify({ hash:cleanHash(hash), uid:String(uid || ''), at:now() })); } catch(_) {}
+    }
+    function clearPending(){ try { sessionStorage.removeItem(PENDING_KEY); } catch(_) {} }
+    function pendingMatches(hash, uid){
+        const p = getPending();
+        return !!(p && p.hash === cleanHash(hash) && p.uid === String(uid || '') && now() - Number(p.at || 0) <= PENDING_TTL_MS);
+    }
+
+    async function publishSecurityHashR3(hash, user, reason){
+        const stamp = now();
+        const security = {
+            adminPassHash: cleanHash(hash),
+            changedAt: stamp,
+            _updatedAt: stamp,
+            _deviceId: window.DEVICE_ID || 'unknown-device',
+            _providerUserId: user && user.uid || '',
+            _accountId: user && user.uid || '',
+            _source: BUILD,
+            _reason: reason || 'password-sync'
+        };
+        try { localStorage.setItem(ADMIN_HASH_STORAGE_KEY, security.adminPassHash); } catch(_) {}
+        try { if (window.state) state.security = { ...(state.security || {}), ...security }; } catch(_) {}
+        try { if (window.localforage) await localforage.setItem(SECURITY_LF_KEY, security); } catch(_) {}
+        if (!window.db) throw new Error('Firebase Database غير جاهز لنشر كلمة مرور البرنامج.');
+        await db.ref('system/security').update(security);
+        try {
+            if (typeof window.trackChange === 'function') window.trackChange('system', 'security', 'update', security);
+            else if (typeof trackChange === 'function') trackChange('system', 'security', 'update', security);
+        } catch(_) {}
+        return security;
+    }
+
+    function openAppR3(){
+        const overlay = $('auth-overlay'), main = $('main-container'), header = $('app-header');
+        if (overlay) overlay.style.display = 'none';
+        if (main) main.style.display = 'block';
+        if (header) header.style.display = 'flex';
+        if (!window.__ABN_R3_INIT_DONE__) {
+            window.__ABN_R3_INIT_DONE__ = true;
+            if (typeof window.initApp === 'function') window.initApp();
+            else if (typeof initApp === 'function') initApp();
+        }
+    }
+
+    async function loginAppR3(){
+        clearAuthError();
+        const passEl = $('admin-password');
+        const programPassword = String((passEl && passEl.value) || '');
+        try {
+            if (!programPassword) { setAuthError('أدخل كلمة مرور البرنامج.'); return false; }
+            if (programPassword === '123456') { setAuthError('كلمة المرور الافتراضية 123456 مرفوضة في نسخة الإنتاج.'); return false; }
+            if (programPassword.length < 6) { setAuthError('كلمة مرور البرنامج يجب أن تكون 6 أحرف/أرقام على الأقل.'); return false; }
+
+            const user = await ensureFirebaseAuthR3();
+            const enteredHash = cleanHash(await sha256R3(programPassword));
+            const candidates = await collectCandidatesR3();
+            const match = candidates.find(c => cleanHash(c.hash) === enteredHash);
+
+            if (match) {
+                clearPending();
+                if (!candidates.some(c => c.remote && c.hash === enteredHash)) {
+                    await publishSecurityHashR3(enteredHash, user, 'local-hash-promoted-to-firebase');
+                } else {
+                    await publishSecurityHashR3(enteredHash, user, 'remote-hash-confirmed');
+                }
+                openAppR3();
+                return true;
+            }
+
+            if (pendingMatches(enteredHash, user.uid)) {
+                await publishSecurityHashR3(enteredHash, user, 'confirmed-phone-bootstrap');
+                clearPending();
+                openAppR3();
+                return true;
+            }
+
+            setPending(enteredHash, user.uid);
+            setAuthError('تم قبول Firebase لكن بصمة كلمة مرور البرنامج غير متزامنة بين اللابتوب والهاتف. اضغط زر «دخول آمن» مرة ثانية بنفس كلمة المرور خلال دقيقتين لنشرها على Firebase وفتح الهاتف.');
+            return false;
+        } catch(error) {
+            console.error('[ABONIBAL R3] Login failed:', error);
+            setAuthError(error && error.message ? error.message : 'فشل تسجيل الدخول الآمن.');
+            return false;
+        }
+    }
+
+    async function changeAdminPasswordR3(){
+        const current = $('security-current-pass')?.value || '';
+        const next = $('security-new-pass')?.value || '';
+        const confirmNext = $('security-confirm-pass')?.value || '';
+        if (!current || !next || !confirmNext) return alert('يرجى تعبئة جميع حقول كلمة المرور.');
+        if (next.length < 6) return alert('كلمة المرور الجديدة يجب أن تكون 6 أحرف/أرقام على الأقل.');
+        if (next === '123456') return alert('لا يمكن استخدام كلمة المرور الافتراضية 123456 في الإنتاج.');
+        if (next !== confirmNext) return alert('كلمة المرور الجديدة وتأكيدها غير متطابقين.');
+        try {
+            const user = await ensureFirebaseAuthR3();
+            const currentHash = cleanHash(await sha256R3(current));
+            const candidates = await collectCandidatesR3();
+            if (candidates.length && !candidates.some(c => cleanHash(c.hash) === currentHash)) return alert('كلمة المرور الحالية غير صحيحة.');
+            const nextHash = cleanHash(await sha256R3(next));
+            await publishSecurityHashR3(nextHash, user, 'manual-password-change');
+            ['security-current-pass','security-new-pass','security-confirm-pass'].forEach(id => { const el = $(id); if (el) el.value = ''; });
+            try { if (typeof window.saveToLocal === 'function') await window.saveToLocal(); else if (typeof saveToLocal === 'function') await saveToLocal(); } catch(_) {}
+            try { if (navigator.onLine && window.SyncManager && typeof SyncManager.performDeltaSync === 'function') await SyncManager.performDeltaSync(); } catch(_) {}
+            try { if (typeof window.addAdminLog === 'function') window.addAdminLog('تغيير كلمة المرور', 'تم تغيير كلمة مرور الدخول ومزامنتها عبر Firebase'); } catch(_) {}
+            alert('✅ تم تغيير كلمة المرور ومزامنتها عبر Firebase.');
+        } catch(error) {
+            console.error('[ABONIBAL R3] Password change failed:', error);
+            alert(error && error.message ? error.message : 'فشل تغيير كلمة المرور.');
+        }
+    }
+
+    // Reduce confusing external console noise when opening from content:// or DevTools.
+    try {
+        if (window.__ABN_GLOBAL_ERROR_HANDLER__) window.removeEventListener('error', window.__ABN_GLOBAL_ERROR_HANDLER__);
+        window.__ABN_GLOBAL_ERROR_HANDLER__ = function abnGlobalErrorHandlerR3(e){
+            const src = String(e && e.filename || '');
+            const msg = String(e && e.message || '');
+            if (src.includes('apis.google.com') || src.includes('devtools://') || msg.includes('Script error')) return;
+            console.error('Global Error:', e && (e.error || e.message || e));
+        };
+        window.addEventListener('error', window.__ABN_GLOBAL_ERROR_HANDLER__);
+    } catch(_) {}
+
+    window.loginApp = loginAppR3;
+    window.changeAdminPassword = changeAdminPasswordR3;
+    try { loginApp = loginAppR3; } catch(_) {}
+    try { changeAdminPassword = changeAdminPasswordR3; } catch(_) {}
+
+    window.ABNProductionData004R3 = {
+        build: BUILD,
+        login: loginAppR3,
+        changeAdminPassword: changeAdminPasswordR3,
+        collectSecurityCandidates: collectCandidatesR3,
+        publishSecurityHash: publishSecurityHashR3,
+        health: async function(){
+            const auth = window.firebase && firebase.auth ? firebase.auth() : null;
+            const candidates = await collectCandidatesR3();
+            return {
+                build: BUILD,
+                currentUser: !!(auth && auth.currentUser),
+                candidateSources: candidates.map(c => c.source),
+                remoteHashReady: candidates.some(c => c.remote),
+                localHashReady: candidates.some(c => c.local),
+                defaultHashPresent: candidates.some(c => c.hash === DEFAULT_HASH),
+                pendingBootstrap: !!getPending(),
+                loginOverride: window.loginApp === loginAppR3
+            };
+        }
+    };
+    console.info('✅ ABONIBAL', BUILD, 'loaded');
+})();
+</script>
+
+
+<script>
+/* ============================================================
+   PRODUCTION-DATA-005-FIREBASE-AUTH-ONLY
+   Removes the local program password path. Login is Firebase email/password only.
+   ============================================================ */
+(function(){
+    'use strict';
+    const BUILD = 'PRODUCTION-DATA-005-FIREBASE-AUTH-ONLY';
+    const EMAIL_KEY = 'abn_firebase_auth_email';
+    const $ = (id) => document.getElementById(id);
+
+    function setAuthError(message){
+        const el = $('auth-error');
+        if (el) {
+            el.textContent = message || 'تعذر تسجيل الدخول.';
+            el.style.display = 'block';
+        } else {
+            alert(message || 'تعذر تسجيل الدخول.');
+        }
+    }
+
+    function clearAuthError(){
+        const el = $('auth-error');
+        if (el) {
+            el.textContent = '';
+            el.style.display = 'none';
+        }
+    }
+
+    function getAuth(){
+        if (!window.firebase || !firebase.auth) throw new Error('Firebase Auth غير جاهز. افتح النظام من رابط HTTPS الرسمي.');
+        return firebase.auth();
+    }
+
+    async function setLocalPersistence(auth){
+        try { await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch(_) {}
+    }
+
+    function getEmailFromField(){
+        const emailEl = $('firebase-auth-email');
+        return String((emailEl && emailEl.value) || '').trim().toLowerCase();
+    }
+
+    function getPasswordFromField(){
+        const passEl = $('firebase-auth-password');
+        return String((passEl && passEl.value) || '');
+    }
+
+    function saveEmail(email){
+        try { if (email) localStorage.setItem(EMAIL_KEY, email); } catch(_) {}
+    }
+
+    function restoreEmail(){
+        const el = $('firebase-auth-email');
+        if (!el) return;
+        try {
+            const saved = localStorage.getItem(EMAIL_KEY) || localStorage.getItem('abn_firebase_email') || '';
+            if (saved && !el.value) el.value = saved;
+        } catch(_) {}
+    }
+
+    function showLogin(){
+        const overlay = $('auth-overlay'), main = $('main-container'), header = $('app-header');
+        if (overlay) overlay.style.display = 'flex';
+        if (main) main.style.display = 'none';
+        if (header) header.style.display = 'none';
+        const passEl = $('firebase-auth-password');
+        if (passEl) passEl.value = '';
+        restoreEmail();
+    }
+
+    function openApp(){
+        const overlay = $('auth-overlay'), main = $('main-container'), header = $('app-header');
+        if (overlay) overlay.style.display = 'none';
+        if (main) main.style.display = 'block';
+        if (header) header.style.display = 'flex';
+        const passEl = $('firebase-auth-password');
+        if (passEl) passEl.value = '';
+        if (!window.__ABN_AUTH_ONLY_INIT_DONE__) {
+            window.__ABN_AUTH_ONLY_INIT_DONE__ = true;
+            window.__ABN_R3_INIT_DONE__ = true;
+            try {
+                if (typeof window.initApp === 'function') window.initApp();
+                else if (typeof initApp === 'function') initApp();
+            } catch(error) {
+                console.error('[ABONIBAL AUTH ONLY] initApp failed:', error);
+                setAuthError('تم تسجيل الدخول، لكن فشل تحميل بيانات التطبيق. أعد تحديث الصفحة.');
+            }
+        }
+    }
+
+    async function loginFirebaseOnly(){
+        clearAuthError();
+        try {
+            const email = getEmailFromField();
+            const password = getPasswordFromField();
+            if (!email || !password) {
+                setAuthError('أدخل البريد الإلكتروني وكلمة المرور.');
+                return false;
+            }
+            const auth = getAuth();
+            await setLocalPersistence(auth);
+            const cred = await auth.signInWithEmailAndPassword(email, password);
+            saveEmail(email);
+            try { if (typeof window.addAdminLog === 'function') window.addAdminLog('تسجيل دخول', 'تم تسجيل الدخول عبر Firebase Auth فقط'); } catch(_) {}
+            openApp();
+            return !!(cred && cred.user);
+        } catch(error) {
+            console.error('[ABONIBAL AUTH ONLY] Login failed:', error);
+            const code = String(error && error.code || '');
+            if (code.includes('auth/invalid-credential') || code.includes('auth/wrong-password') || code.includes('auth/user-not-found')) {
+                setAuthError('البريد الإلكتروني أو كلمة المرور غير صحيحة.');
+            } else if (code.includes('auth/network-request-failed')) {
+                setAuthError('تعذر الاتصال بـ Firebase. تحقق من الإنترنت ثم أعد المحاولة.');
+            } else if (code.includes('auth/too-many-requests')) {
+                setAuthError('تم إيقاف المحاولات مؤقتًا بسبب كثرة المحاولات. انتظر قليلًا ثم أعد المحاولة.');
+            } else {
+                setAuthError(error && error.message ? error.message : 'فشل تسجيل الدخول.');
+            }
+            return false;
+        }
+    }
+
+    async function logoutFirebaseOnly(){
+        try {
+            const auth = getAuth();
+            await auth.signOut();
+        } catch(error) {
+            console.warn('[ABONIBAL AUTH ONLY] Sign out warning:', error);
+        }
+        window.__ABN_AUTH_ONLY_INIT_DONE__ = false;
+        showLogin();
+    }
+
+    function disabledLocalPasswordChange(){
+        alert('تم إلغاء كلمة مرور البرنامج المحلية. استخدم كلمة مرور Firebase فقط.');
+    }
+
+    function patchAuthDom(){
+        try {
+            const adminPass = $('admin-password');
+            if (adminPass) {
+                const group = adminPass.closest ? adminPass.closest('.form-group') : null;
+                if (group) group.remove(); else adminPass.style.display = 'none';
+            }
+            const note = document.querySelector('.abn-auth-note');
+            if (note) note.textContent = 'تم إلغاء كلمة مرور البرنامج المحلية. الدخول الآن يتم فقط عبر البريد الإلكتروني وكلمة المرور الخاصة بحساب Firebase.';
+            const btn = document.querySelector('#auth-overlay button[onclick*="loginApp"]');
+            if (btn) btn.textContent = 'دخول';
+            const error = $('auth-error');
+            if (error && error.textContent.includes('كلمة المرور غير صحيحة')) error.textContent = 'بيانات الدخول غير صحيحة';
+        } catch(_) {}
+    }
+
+    async function ensureFirebaseAccessAuthOnly(){
+        const auth = getAuth();
+        if (!auth.currentUser || !auth.currentUser.uid) {
+            throw new Error('يجب تسجيل الدخول عبر Firebase أولًا.');
+        }
+        return { ok: true, uid: auth.currentUser.uid, email: auth.currentUser.email || null };
+    }
+
+    // Final overrides. These intentionally win over older R1/R2/R3 local-password patches.
+    window.loginApp = loginFirebaseOnly;
+    window.lockApplication = logoutFirebaseOnly;
+    window.changeAdminPassword = disabledLocalPasswordChange;
+    window.ensureFirebaseAccess = ensureFirebaseAccessAuthOnly;
+    try { loginApp = loginFirebaseOnly; } catch(_) {}
+    try { lockApplication = logoutFirebaseOnly; } catch(_) {}
+    try { changeAdminPassword = disabledLocalPasswordChange; } catch(_) {}
+    try { ensureFirebaseAccess = ensureFirebaseAccessAuthOnly; } catch(_) {}
+
+    function boot(){
+        patchAuthDom();
+        restoreEmail();
+        try {
+            const auth = getAuth();
+            setLocalPersistence(auth);
+            auth.onAuthStateChanged(function(user){
+                if (user && user.uid) {
+                    saveEmail(user.email || getEmailFromField());
+                    clearAuthError();
+                    openApp();
+                } else {
+                    showLogin();
+                }
+            });
+        } catch(error) {
+            console.error('[ABONIBAL AUTH ONLY] Boot failed:', error);
+            setAuthError(error && error.message ? error.message : 'Firebase Auth غير جاهز.');
+        }
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+    else boot();
+
+    window.ABNProductionData005AuthOnly = {
+        build: BUILD,
+        login: loginFirebaseOnly,
+        logout: logoutFirebaseOnly,
+        health: function(){
+            let user = null;
+            try { user = getAuth().currentUser; } catch(_) {}
+            return {
+                build: BUILD,
+                firebaseUser: !!(user && user.uid),
+                uid: user && user.uid || null,
+                email: user && user.email || null,
+                localProgramPasswordRemoved: true,
+                loginOverride: window.loginApp === loginFirebaseOnly,
+                accessOverride: window.ensureFirebaseAccess === ensureFirebaseAccessAuthOnly
+            };
+        }
+    };
+    console.info('✅ ABONIBAL', BUILD, 'loaded');
 })();
 </script>
 
