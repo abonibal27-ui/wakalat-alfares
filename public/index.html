@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#064e3b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ABONIBAL ERP">
+<meta name="application-name" content="ABONIBAL ERP">
+<title>ABONIBAL ERP</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/styles.css">
+<link rel="stylesheet" href="/css/invoice.css">
+<link rel="stylesheet" href="/css/print.css">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+<script src="/js/firebase-config.js"></script>
+<script src="/js/app.js" defer></script>
+<script src="/js/ui.js" defer></script>
+<script src="/js/auth.js" defer></script>
+</head>
+<body>
+<!-- Auth Overlay -->
+<div id="auth-overlay">
+    <div class="auth-box">
+        <h2>&#x062A;&#x0633;&#x062C;&#x064A;&#x0644; &#x0627;&#x0644;&#x062F;&#x062E;&#x0648;&#x0644;</h2>
+        <div class="form-group abn-firebase-auth-field">
+            <input id="firebase-auth-email" type="email" placeholder="&#x0627;&#x0644;&#x0628;&#x0631;&#x064A;&#x062F; &#x0627;&#x0644;&#x0625;&#x0644;&#x0643;&#x062A;&#x0631;&#x0648;&#x0646;&#x064A;" autocomplete="username" aria-label="&#x0627;&#x0644;&#x0628;&#x0631;&#x064A;&#x062F; &#x0627;&#x0644;&#x0625;&#x0644;&#x0643;&#x062A;&#x0631;&#x0648;&#x0646;&#x064A;">
+        </div>
+        <div class="form-group abn-firebase-auth-field">
+            <input id="firebase-auth-password" type="password" placeholder="&#x0643;&#x0644;&#x0645;&#x0629; &#x0645;&#x0631;&#x0648;&#x0631; Firebase" autocomplete="current-password" aria-label="&#x0643;&#x0644;&#x0645;&#x0629; &#x0645;&#x0631;&#x0648;&#x0631; Firebase">
+        </div>
+        <p class="abn-auth-note">&#x0627;&#x0644;&#x062F;&#x062E;&#x0648;&#x0644; &#x064A;&#x062A;&#x0645; &#x0641;&#x0642;&#x0637; &#x0639;&#x0628;&#x0631; &#x0627;&#x0644;&#x0628;&#x0631;&#x064A;&#x062F; &#x0627;&#x0644;&#x0625;&#x0644;&#x0643;&#x062A;&#x0631;&#x0648;&#x0646;&#x064A; &#x0648;&#x0643;&#x0644;&#x0645;&#x0629; &#x0645;&#x0631;&#x0648;&#x0631; &#x062D;&#x0633;&#x0627;&#x0628; Firebase.</p>
+        <button id="firebase-login-btn" type="button">&#x062F;&#x062E;&#x0648;&#x0644;</button>
+        <div id="auth-error" style="color: red; margin-top: 10px; display: none;"></div>
+    </div>
+</div>
+
+
+
+<!-- Header -->
+<header id="app-header">
+    <div style="display:flex; align-items:center;">
+        <button onclick="toggleSidebar()" style="background:transparent; border:none; color:white; font-size:24px; width:auto; padding:0 10px;">☰</button>
+        <span data-abn-bind="businessName">اسم المتجر</span>
+        <span id="connection-status">🟢</span>
+        <span class="sync-status" id="sync-status-text">🔄 متزامن</span>
+    </div>
+    <div style="display:flex; align-items:center; gap: 10px;">
+        <button class="sync-btn" style="background: var(--info-color);" onclick="pullFromCloud()" id="pull-btn-ui">🔽 استرجاع</button>
+        <button class="sync-btn" onclick="SyncManager.manualSync()" id="sync-btn-ui">🔼 رفع</button>
+        <button onclick="toggleDarkMode()" style="width:auto; padding:5px; font-size:20px; background:transparent; border:none; color:white;">🌙</button>
+    </div>
+</header> 
+
+<!-- Sidebar -->
+<div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+<nav class="nav-bar" id="app-nav-bar">
+    <div class="nav-item active" onclick="switchTab('dash', this)"><span class="icon">📊</span><span>الرئيسية</span></div>
+    <div class="nav-item" onclick="switchTab('retail', this)"><span class="icon">🛍️</span><span>مفرق</span></div>
+    <div class="nav-item" onclick="switchTab('pos', this)"><span class="icon">🧾</span><span>فاتورة</span></div>
+    <div class="nav-item" onclick="switchTab('invoices-history', this)"><span class="icon">📜</span><span>الفواتير</span></div>
+    <div class="nav-item" onclick="switchTab('products', this)"><span class="icon">📦</span><span>المخزن</span></div>
+    <div class="nav-item" onclick="switchTab('exchange', this)"><span class="icon">💱</span><span>الصرافة</span></div>
+    <div class="nav-item" onclick="switchTab('tracking', this)"><span class="icon">🔍</span><span>الحركة</span></div>
+    <div class="nav-item" onclick="switchTab('shortages', this)"><span class="icon">⚠️</span><span>النواقص</span></div>
+    <div class="nav-item" onclick="switchTab('clients', this)"><span class="icon">👥</span><span>العملاء</span></div>
+    <div class="nav-item" onclick="switchTab('suppliers', this)"><span class="icon">🏢</span><span>الموردين</span></div>
+    <div class="nav-item" onclick="switchTab('expenses', this)"><span class="icon">💸</span><span>المصاريف</span></div>
+    <div class="nav-item" onclick="switchTab('partners', this)"><span class="icon">💼</span><span>الشركاء</span></div>
+    <div class="nav-item" onclick="switchTab('categories', this)"><span class="icon">🗂️</span><span>الأقسام</span></div>
+    <div class="nav-item" onclick="switchTab('logs', this)"><span class="icon">📋</span><span>السجل</span></div>
+    <div class="nav-item" onclick="switchTab('ledger', this)"><span class="icon">📚</span><span>دفتر الأستاذ</span></div>
+    <div class="nav-item" onclick="switchTab('security', this)"><span class="icon">🔐</span><span>الأمان</span></div>
+    <div class="nav-item" onclick="switchTab('system', this)"><span class="icon">🏷️</span><span>النظام والترخيص</span></div>
+</nav> 
+
+<!-- Main Container -->
+<div class="container" id="main-container"> 
+    <button id="install-btn" style="display:none; background-color: var(--warning-color); margin-bottom: 15px;">📲 تثبيت التطبيق على الهاتف</button>
+    
+    <div class="loading-spinner" id="global-spinner">
+        <span class="spinner"></span> جاري التحميل...
+    </div>
+    
+    <!-- Dashboard Tab -->
+    <div id="tab-dash" class="tab-content active">
+        <div class="card-title">📉 لوحة التحكم المالية والمخزنية</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+            <div class="db-box" style="padding: 10px; background: #dcfce7; border: 1px solid #86efac;">
+                <h4 style="color: #166534; font-size: 11px;">الصندوق ($)</h4>
+                <p id="db-safe-usd" style="color: #166534; font-size: 16px;">0.00</p>
+            </div>
+            <div class="db-box" style="padding: 10px; background: #e0f2fe; border: 1px solid #7dd3fc;">
+                <h4 style="color: #075985; font-size: 11px;">الصندوق (₺)</h4>
+                <p id="db-safe-try" style="color: #075985; font-size: 16px;">0</p>
+            </div>
+            <div class="db-box" style="padding: 10px; background: #f3e8ff; border: 1px solid #d8b4fe;">
+                <h4 style="color: #6b21a8; font-size: 11px;">الصندوق (ل.س)</h4>
+                <p id="db-safe-syp" style="color: #6b21a8; font-size: 16px;">0</p>
+            </div>
+        </div>
+        <div class="dashboard-grid">
+            <div class="db-box">
+                <h4>قيمة البضاعة (الشراء)</h4>
+                <p style="color: #475569;" id="db-purchases">0.00 $</p>
+            </div>
+            <div class="db-box">
+                <h4>ديون مستحقة للتجار</h4>
+                <p style="color: var(--danger-color);" id="db-suppliers-debts">0.00 $</p>
+            </div> 
+            <div class="db-box profit">
+                <div class="sub-profit-box">
+                    <h4 style="font-weight: bold;">💰 إجمالي المبيعات</h4>
+                    <p style="font-size: 24px;" id="db-sales">0.00 $</p>
+                </div>
+                <div class="sub-profit-box">
+                    <h4 style="font-weight: bold;">🌟 صافي الأرباح</h4>
+                    <p style="font-size: 24px;" id="db-profit">0.00 $</p>
+                </div>
+            </div>
+        </div> 
+        <div class="card">
+            <div class="card-title">الحالة العامة والديون</div>
+            <p style="margin-bottom: 10px; color: var(--danger-color); font-weight: bold; font-size: 15px;">🔴 ديون الزبائن: <span id="db-total-debts">0.00</span> $</p>
+            <p style="margin-bottom: 8px;">مبيعات الفواتير: <strong id="db-inv-sales">0.00</strong> $</p>
+            <p style="margin-bottom: 8px;">مبيعات المفرق: <strong id="db-retail-sales">0.00</strong> $</p>
+            <p style="margin-bottom: 8px;">مصاريف المحل: <strong id="db-expenses" style="color:var(--danger-color);">0.00</strong> $</p>
+            <p style="margin-bottom: 8px;">قطع الغيار: <strong id="db-prod-count">0</strong> قطعة</p>
+            <p style="margin-bottom: 8px;">🔄 إصدار المزامنة: <strong id="db-sync-version">0</strong></p>
+        </div>
+
+    <!-- Profit Stats -->
+    <div class="card hide-on-print">
+        <div class="card-title">📈 إحصائيات الأرباح</div>
+        <p style="margin-bottom:10px;">💰 ربح اليوم: <strong id="profit-day">0.00 $</strong></p>
+        <p style="margin-bottom:10px;">💰 ربح الأسبوع: <strong id="profit-week">0.00 $</strong></p>
+        <p style="margin-bottom:10px;">💰 ربح الشهر: <strong id="profit-month">0.00 $</strong></p>
+        <p>💰 ربح السنة: <strong id="profit-year">0.00 $</strong></p>
+    </div>
+    </div>
+
+
+    <!-- Exchange Tab -->
+    <div id="tab-exchange" class="tab-content">
+        <div class="card">
+            <div class="card-title">💱 أسعار الصرف اليومية</div>
+            <div class="form-group">
+                <label for="rate-try">1 دولار أمريكي ($) = (ليرة تركية ₺)</label>
+                <input type="number" id="rate-try" step="0.01" value="0" min="0" onchange="saveRates()">
+            </div>
+            <div class="form-group">
+                <label for="rate-syp">1 دولار أمريكي ($) = (ليرة سورية ل.س)</label>
+                <input type="number" id="rate-syp" step="100" value="0" min="0" onchange="saveRates()">
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-title">🔄 عملية تصريف جديدة</div>
+            <div class="form-group">
+                <label for="exch-from">العملة التي أعطيتها (خروج)</label>
+                <select id="exch-from"><option value="try">ليرة تركية (₺)</option><option value="syp">ليرة سورية (ل.س)</option><option value="usd">دولار أمريكي ($)</option></select>
+            </div>
+            <div class="form-group"><label for="exch-amount-from">المبلغ المصرّف</label><input type="number" id="exch-amount-from" step="any" min="0"></div>
+            <div class="form-group">
+                <label for="exch-to">العملة التي استلمتها (دخول)</label>
+                <select id="exch-to"><option value="usd">دولار أمريكي ($)</option><option value="try">ليرة تركية (₺)</option><option value="syp">ليرة سورية (ل.س)</option></select>
+            </div>
+            <div class="form-group"><label for="exch-amount-to">المبلغ المستلم</label><input type="number" id="exch-amount-to" step="any" min="0"></div>
+            <button onclick="submitExchange()" style="background-color: var(--info-color);">♻️ تسجيل التصريف</button>
+        </div>
+        <div class="card">
+            <div class="card-title">سجل التصريف التاريخي</div>
+            <div id="exchange-list"></div>
+        </div>
+    </div>
+
+    <!-- Retail Tab -->
+    <div id="tab-retail" class="tab-content">
+        <div class="card">
+            <div class="card-title">🛍️ بيع مفرق مباشر</div> 
+            <div class="form-group" style="position: relative;">
+                <label for="ret-search-input">ابحث عن قطعة</label>
+                <input type="text" id="ret-search-input" placeholder="اكتب اسم القطعة..." oninput="debouncedFilterRetail()" autocomplete="off">
+                <select id="ret-product-select" size="4" onchange="selectRetailProduct()" style="display: none; height: auto; position: absolute; z-index: 10; width: 100%; box-shadow: var(--card-shadow);" aria-label="نتائج بحث قطعة البيع المفرق"></select>
+                <div id="ret-product-results" class="product-search-results"></div>
+            </div> 
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div class="form-group"><label for="ret-qty">الكمية</label><input type="number" id="ret-qty" value="1" min="1" oninput="calculateRetailTotal()"></div>
+                <div class="form-group"><label for="ret-price">السعر ($)</label><input type="number" id="ret-price" step="0.01" value="0" min="0" oninput="calculateRetailTotal()"></div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div class="form-group"><label for="ret-payment-type">نوع البيع</label><select id="ret-payment-type" onchange="toggleRetailClientSelect()"><option value="cash">نقدي</option><option value="debt">دين</option></select></div>
+                <div class="form-group" id="ret-currency-group"><label for="ret-currency">العملة</label><select id="ret-currency" onchange="calculateRetailTotal()"><option value="usd">دولار ($)</option><option value="try">تركي (₺)</option><option value="syp">سوري (ل.س)</option></select></div>
+            </div>
+            <div class="form-group" id="ret-client-group" style="display: none;">
+                <label for="ret-client-select">اختر العميل (للدين)</label>
+                <select id="ret-client-select"><option value="">-- اختر العميل --</option></select>
+            </div>
+            <div class="form-group">
+                <label for="ret-paid-amount">الدفعة المستلمة</label>
+                <div style="display:flex; gap:5px;">
+                    <input type="number" id="ret-paid-amount" value="0" step="0.01" min="0" oninput="calculateRetailTotal()">
+                    <select id="ret-paid-currency" style="width:100px;" onchange="calculateRetailTotal()" aria-label="عملة الدفعة المستلمة للبيع المفرق">
+                        <option value="usd">$ دولار</option>
+                        <option value="try">₺ تركي</option>
+                        <option value="syp">ل.س سوري</option>
+                    </select>
+                </div>
+                <span id="ret-paid-eq" style="display:block;font-size:12px;color:#64748b;margin-top:5px;"></span>
+            </div>
+            <div class="form-group" style="background: var(--bg-color); padding: 12px; border-radius: 10px; font-weight: bold; border: 1px solid #cbd5e1;">
+                الإجمالي: <span id="ret-total-preview" style="color:var(--success-color); font-size: 18px;">0.00</span> $
+                <span id="ret-eq-text" style="display: block; font-size: 12px; color: #64748b; margin-top: 5px;"></span>
+            </div>
+            <button onclick="submitRetailSale()" id="btn-submit-retail" style="background-color: var(--success-color);">⚡ تسجيل وخصم</button>
+        </div> 
+        <div class="card">
+            <div class="card-title">سجل المبيعات اليومية</div>
+            <div id="retail-sales-list"></div>
+        </div>
+    </div> 
+
+    <!-- POS Tab -->
+    <div id="tab-pos" class="tab-content">
+        <div class="card hide-on-print">
+            <div class="card-title" id="pos-title">إنشاء فاتورة جديدة</div>
+            <div class="form-group"><label for="inv-client-select">العميل</label><select id="inv-client-select" onchange="updateInvoiceClientName()"><option value="عام">عميل عام / نقدي</option></select></div> 
+            <div class="form-group">
+                <label for="invoice-price-type">نوع السعر</label>
+                <select id="invoice-price-type">
+                    <option value="retail">مفرق</option>
+                    <option value="wholesale">جملة</option>
+                </select>
+            </div>
+            <div class="form-group" style="position: relative;">
+                <label for="inv-search-input">البحث لإضافة قطعة</label>
+                <input type="text" id="inv-search-input" placeholder="اكتب اسم القطعة..." oninput="debouncedFilterInvoice()" autocomplete="off">
+                <select id="inv-product-select" size="4" onchange="addProductToInvoice()" style="display: none; height: auto; position: absolute; z-index: 10; width: 100%; box-shadow: var(--card-shadow);" aria-label="نتائج بحث إضافة قطعة إلى الفاتورة"></select>
+                <div id="inv-product-results" class="product-search-results"></div>
+            </div>
+            <div class="form-group">
+                <label for="inv-paid-amount">الدفعة المستلمة:</label>
+                <div style="display:flex; gap:5px;">
+                    <input type="number" id="inv-paid-amount" placeholder="0.00" value="0" min="0" oninput="calculateInvoiceTotal()">
+                    <select id="inv-currency" onchange="calculateInvoiceTotal()" style="width:100px;" aria-label="عملة الدفعة المستلمة في الفاتورة"><option value="usd">$ دولار</option><option value="try">₺ تركي</option><option value="syp">ل.س سوري</option></select>
+                </div>
+                <span id="inv-paid-eq" style="display: block; font-size: 12px; color: #64748b; margin-top: 5px;"></span>
+            </div>
+            <div class="form-group">
+                <label for="inv-discount">الحسم ($)</label>
+                <input type="number" id="inv-discount" value="0" step="0.01" min="0" oninput="calculateInvoiceTotal()">
+            </div>
+        </div> 
+
+        <!-- ===== الفاتورة مع التصميم الجديد ===== -->
+        <div class="card" id="invoice-sheet" style="padding: 10px;">
+            <div class="invoice-preview">
+                <!-- رأس الفاتورة الجديد -->
+                <div class="inv-grid-header">
+                    <!-- العمود الأيسر: أرقام التواصل -->
+                    <div class="inv-contact-side">
+                        <div data-abn-phone-row="1"><span class="contact-icon">📞</span> معلومات التواصل من الإعدادات</div>
+                        <div data-abn-phone-row="2"><span class="contact-icon">📞</span> معلومات التواصل من الإعدادات</div>
+                    </div>
+                    
+                    <!-- العمود الأوسط: اسم المتجر بشكل هندسي -->
+                    <div class="inv-shop-center">
+                        <div class="inv-shop-title-main">
+                            <span class="inv-shop-title-deco">◈</span>
+                            <span data-abn-bind="invoiceBusinessName">اسم المتجر</span>
+                            <span class="inv-shop-title-deco">◈</span>
+                        </div>
+                        <div class="inv-shop-divider">
+                            <span class="line"></span>
+                            <span class="diamond">◆</span>
+                            <span class="line"></span>
+                        </div>
+                        <div class="inv-shop-subtitle">
+                            <span data-abn-bind="businessSubtitle">النشاط التجاري</span>
+                        </div>
+                    </div>
+                    
+                    <!-- العمود الأيمن: الشعار (مكبر - يملأ المربع) -->
+                    <div class="inv-logo-side">
+                        <img src="" alt="شعار المتجر" loading="lazy" data-abn-bind="businessLogo">
+                    </div>
+                </div>
+
+                <!-- معلومات الفاتورة -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #000; border-top: none; margin-bottom: 12px; text-align: center; font-size: 13px; font-weight: bold;">
+                    <div style="padding: 6px; border-left: 1px solid #000;" id="inv-date-time-box">الوقت والتاريخ: --:--</div>
+                    <div style="padding: 6px;">رقم الفاتورة: <span id="inv-id-display" style="color:#ef4444;">00000</span></div>
+                </div> 
+
+                <div class="invoice-client-row" style="font-size: 14px; font-weight: bold; margin-bottom: 10px;">العميل: <span id="inv-client-name" style="color:#006400;">عام</span></div> 
+
+                <table class="invoice-table">
+                    <thead>
+                        <tr>
+                            <th style="width:5%;">م</th>
+                            <th style="width:15%;">الصورة</th>
+                            <th style="width:35%;">المادة</th>
+                            <th style="width:15%;">الكمية</th>
+                            <th style="width:20%;">السعر ($)</th>
+                            <th class="hide-on-print" style="width:10%;">إجراء</th>
+                        </tr>
+                    </thead>
+                    <tbody id="invoice-items-tbody"></tbody>
+                </table> 
+
+                <div style="display: flex; flex-direction: column; align-items: flex-end; margin-bottom: 12px;">
+                    <div class="inv-summary-row"><div style="background:#e2e8f0; padding:6px; border-left:1px solid #000;">الإجمالي:</div><div style="padding:6px; color:#006400; font-size:15px;"><span id="invoice-total">0.00</span> $</div></div>
+                    <div class="inv-summary-row"><div style="background:#e2e8f0; padding:6px; border-left:1px solid #000;">المدفوع:</div><div style="padding:6px;"><span id="invoice-paid-display">0.00</span></div></div>
+                    <div class="inv-summary-row"><div style="background:#e2e8f0; padding:6px; border-left:1px solid #000;">الباقي:</div><div style="padding:6px; color:red;"><span id="invoice-remaining">0.00</span> $</div></div>
+                </div> 
+                <div id="invoice-live-currencies" style="text-align:center; font-weight:bold; font-size:14px; margin-bottom:10px; color:#000;"></div>
+                <div class="invoice-footer-note" data-abn-bind="invoiceFooter">شكراً لتعاملكم معنا</div>
+            </div>
+        </div> 
+        <div class="hide-on-print" style="display: flex; gap: 10px; margin-bottom: 10px;">
+            <button id="main-print-btn" onclick="saveAndPrintInvoice()" style="background-color: var(--success-color); flex: 1;">💾 حفظ وطباعة</button>
+            <button onclick="shareWhatsApp()" style="background-color: #25D366; flex: 1;">💬 إرسال واتساب</button>
+        </div>
+        <button class="hide-on-print" onclick="clearInvoiceManual()" style="background-color: #64748b;">🔄 تفريغ الفاتورة</button>
+    </div>
+
+    <!-- Invoices History Tab -->
+    <div id="tab-invoices-history" class="tab-content">
+        <div class="card">
+            <div class="card-title">📜 الفواتير الصادرة</div>
+            <div id="invoices-list"></div>
+            <div class="pagination" id="invoices-pagination"></div>
+        </div>
+    </div>
+
+    <!-- Products Tab -->
+    <div id="tab-products" class="tab-content">
+        <div class="card" style="background-color:#fefce8;">
+            <div class="card-title">💾 النسخ الاحتياطي والاستعادة</div>
+            <div style="display:flex; gap:10px;">
+                <button onclick="exportBackup()" style="background-color:#16a34a; flex:1;">💾 إنشاء نسخة</button>
+                <label for="backup-import" style="background:#ca8a04; color:white; padding:12px; border-radius:12px; font-weight:bold; cursor:pointer; text-align:center; flex:1;">📂 استعادة نسخة</label>
+                <input type="file" id="backup-import" accept=".json" style="display:none;" onchange="importBackup(event)">
+            </div>
+        </div>  
+        <div class="card" style="background-color: #e0f2fe;">
+            <div class="card-title">📊 إدارة البيانات</div>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="exportToExcel()" style="background-color: #0284c7; flex: 1;">📥 تحميل إكسيل</button>
+                <label for="excel-import" style="background-color: #0ea5e9; color: white; padding: 12px; border-radius: 12px; font-weight: bold; cursor: pointer; text-align: center; flex: 1;">📤 استيراد</label>
+                <input type="file" id="excel-import" accept=".xlsx, .xls" style="display:none;" onchange="importFromExcel(event)">
+            </div>
+        </div>
+
+        <div class="card" id="product-form-container">
+            <div class="card-title" id="form-product-title">إضافة قطعة واحدة</div>
+            <div class="form-group"><label for="prod-name">اسم القطعة</label><input type="text" id="prod-name"></div>
+            <div class="form-group"><label for="prod-category">القسم</label><select id="prod-category"></select></div> 
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                <div class="form-group"><label for="prod-cost">الشراء ($)</label><input type="number" id="prod-cost" step="0.01" min="0"></div>
+                <div class="form-group"><label for="prod-wholesale">الجملة ($)</label><input type="number" id="prod-wholesale" step="0.01" min="0"></div>
+                <div class="form-group"><label for="prod-retail">المفرق ($)</label><input type="number" id="prod-retail" step="0.01" min="0"></div>
+            </div>
+            <div class="form-group"><label for="prod-stock">الكمية</label><input type="number" id="prod-stock" value="10" min="0"></div>
+            <div class="form-group"><label for="prod-image">صورة <small>(يتم ضغطها)</small></label><input type="file" id="prod-image" accept="image/*" style="padding: 8px;"></div>
+            <button onclick="saveProduct()" id="save-prod-btn">💾 حفظ القطعة</button>
+            <button onclick="resetAllStock()" style="background-color:#dc2626;margin-top:10px;">🔄 تصفير الكميات</button>
+            <button onclick="cancelEditProduct()" id="cancel-edit-btn" style="display:none; background-color: #64748b; margin-top: 10px;">❌ إلغاء التعديل</button>
+        </div>
+        
+        <div class="card">
+            <div class="card-title">مخزن قطع الغيار</div>
+            <input type="text" id="prod-search" placeholder="ابحث باسم القطعة..." oninput="debouncedUpdateProducts()" style="margin-bottom:15px;" autocomplete="off" aria-label="البحث في المنتجات">
+            <div id="products-list"></div>
+            <div class="pagination" id="products-pagination"></div>
+        </div>
+    </div> 
+
+    <!-- Tracking Tab -->
+    <div id="tab-tracking" class="tab-content">
+        <div class="card">
+            <div class="card-title">🔍 مراقبة حركة المادة</div>
+            <div class="form-group" style="position: relative;">
+                <label for="track-search-input">ابحث عن القطعة لعرض سجلها</label>
+                <input type="text" id="track-search-input" placeholder="اكتب اسم القطعة..." oninput="debouncedFilterTracking()" autocomplete="off">
+                <select id="track-product-select" size="4" onchange="selectTrackingProduct()" style="display: none; height: auto; position: absolute; z-index: 10; width: 100%; box-shadow: var(--card-shadow);" aria-label="نتائج بحث سجل حركة القطعة"></select>
+                <div id="track-product-results" class="product-search-results"></div>
+            </div>
+            <div id="tracking-list" style="margin-top: 15px;">
+                <p style="text-align:center; color:#64748b;">الرجاء البحث واختيار قطعة لعرض حركتها.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shortages Tab -->
+    <div id="tab-shortages" class="tab-content">
+        <div class="card hide-on-print">
+            <div class="card-title">⚠️ النواقص (طلبية شراء تلقائية)</div>
+            <p style="margin-bottom: 12px; color:#64748b; font-size:13px; font-weight:600;">تظهر هنا أي قطعة يصل مخزونها إلى 3 قطع أو أقل.</p>
+            <button onclick="window.print()" style="margin-bottom:15px; background-color:var(--primary-color);">🖨️ طباعة القائمة</button>
+        </div>
+        <div class="card">
+            <div id="shortages-list"></div>
+        </div>
+    </div>
+
+    <!-- Clients Tab -->
+    <div id="tab-clients" class="tab-content">
+        <div class="card" id="client-form-container">
+            <div class="card-title" id="form-client-title">إضافة عميل (زبون)</div>
+            <div class="form-group"><label for="client-name">الاسم</label><input type="text" id="client-name"></div>
+            <div class="form-group"><label for="client-phone">الرقم</label><input type="text" id="client-phone"></div>
+            <button onclick="saveClient()" id="save-client-btn" style="background-color: var(--info-color);">👥 حفظ العميل</button>
+        </div> 
+        <div class="card">
+            <div class="card-title">قائمة العملاء (الديون بالدولار)</div>
+            <div id="clients-list"></div>
+        </div>
+    </div> 
+
+    <!-- Suppliers Tab -->
+    <div id="tab-suppliers" class="tab-content">
+        <div class="card" id="supplier-form-container">
+            <div class="card-title" id="form-supplier-title">إضافة تاجر (مورد)</div>
+            <div class="form-group"><label for="supplier-name">اسم التاجر</label><input type="text" id="supplier-name"></div>
+            <div class="form-group"><label for="supplier-phone">الرقم</label><input type="text" id="supplier-phone"></div>
+            <button onclick="saveSupplier()" id="save-supplier-btn" style="background-color: var(--warning-color);">🏢 حفظ التاجر</button>
+        </div> 
+        <div class="card">
+            <div class="card-title">حسابات التجار والموردين</div>
+            <div id="suppliers-list"></div>
+        </div>
+    </div> 
+
+    <!-- Expenses Tab -->
+    <div id="tab-expenses" class="tab-content">
+        <div class="card">
+            <div class="card-title">تسجيل مصروف تشغيلي</div>
+            <div class="form-group"><label for="exp-title">البيان</label><input type="text" id="exp-title"></div>
+            <div class="form-group">
+                <label for="exp-amount">المبلغ المدفوع</label>
+                <div style="display:flex; gap:5px;">
+                    <input type="number" id="exp-amount" step="any" min="0">
+                    <select id="exp-currency" style="width:100px;" aria-label="عملة المصروف"><option value="usd">$</option><option value="try">₺</option><option value="syp">ل.س</option></select>
+                </div>
+            </div>
+            <button onclick="saveExpense()" style="background-color: var(--danger-color);">📉 تسجيل المصروف</button>
+        </div>
+        <div class="card">
+            <div class="card-title">سجل المصاريف التشغيلية</div>
+            <div id="expenses-list"></div>
+        </div>
+    </div>
+
+    <!-- Partners Tab -->
+    <div id="tab-partners" class="tab-content">
+        <div class="card">
+            <div class="card-title">💰 إضافة رأس مال</div>
+            <div class="form-group"><label for="capital-name">اسم الشريك</label>
+            <select id="capital-name"><option value="الشريك 1">الشريك 1</option><option value="الشريك 2">الشريك 2</option></select></div>
+            <div class="form-group"><label for="capital-note">ملاحظة</label><input type="text" id="capital-note"></div>
+            <div class="form-group"><label for="capital-amount">المبلغ</label><div style="display:flex; gap:5px;"><input type="number" id="capital-amount" step="any" min="0"><select id="capital-currency" style="width:100px;" aria-label="عملة رأس المال"><option value="usd">$</option><option value="try">₺</option><option value="syp">ل.س</option></select></div></div>
+            <button onclick="saveCapitalRecord()">💰 إضافة رأس المال</button>
+        </div>
+        <div class="card"><div class="card-title">سجل رأس المال</div><div id="capital-list"></div></div>
+
+        <div class="card">
+            <div class="card-title">💼 تسجيل سحب شريك</div>
+            <p style="margin-bottom: 12px; color:#64748b; font-size:13px; font-weight:600;">تُخصم من الصندوق ولا تُحسب ضمن مصاريف المحل.</p>
+            <div class="form-group">
+                <label for="partner-name">اسم الشريك</label>
+                <select id="partner-name">
+                    <option value="الشريك 1">الشريك 1</option>
+                    <option value="الشريك 2">الشريك 2</option>
+                </select>
+            </div>
+            <div class="form-group"><label for="partner-note">البيان</label><input type="text" id="partner-note" placeholder="مثال: مصروف منزل..."></div>
+            <div class="form-group">
+                <label for="partner-amount">المبلغ المسحوب</label>
+                <div style="display:flex; gap:5px;">
+                    <input type="number" id="partner-amount" step="any" min="0">
+                    <select id="partner-currency" style="width:100px;" aria-label="عملة سحب الشريك"><option value="usd">$</option><option value="try">₺</option><option value="syp">ل.س</option></select>
+                </div>
+            </div>
+            <button onclick="savePartnerWithdrawal()" style="background-color: var(--info-color);">💸 تسجيل السحب</button>
+        </div>
+        <div class="dashboard-grid">
+            <div class="db-box" style="background:#f0fdfa; border: 1px solid #5eead4;">
+                <h4 style="color:#0f766e;">سحوبات الشريك 1</h4>
+                <p id="total-abunibal" style="color:#0f766e; font-size: 18px;">0.00 $</p>
+            </div>
+            <div class="db-box" style="background:#f0fdfa; border: 1px solid #5eead4;">
+                <h4 style="color:#0f766e;">سحوبات الشريك 2</h4>
+                <p id="total-abuabdo" style="color:#0f766e; font-size: 18px;">0.00 $</p>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-title">سجل حسابات الشركاء</div>
+            <div id="partners-list"></div>
+        </div>
+    </div>
+
+    <!-- Categories Tab -->
+    <div id="tab-categories" class="tab-content">
+        <div class="card">
+            <div class="card-title">إضافة قسم</div>
+            <div class="form-group"><input type="text" id="cat-name" placeholder="مثال: إطارات" aria-label="اسم القسم"></div>
+            <button onclick="saveCategory()">➕ حفظ</button>
+        </div>
+        <div class="card">
+            <div class="card-title">الأصناف الحالية</div>
+            <div id="categories-list"></div>
+        </div>
+    </div>
+
+    <!-- ===== LOGS TAB - مع أزرار المسح الجديدة ===== -->
+    <div id="tab-logs" class="tab-content">
+        <div class="card">
+            <div class="card-title">📋 سجل حركات النظام</div>
+            <button onclick="clearLogs()" style="background-color:#ef4444; width: auto; font-size: 12px; padding: 8px 15px; margin-bottom: 10px;">🗑️ مسح سجل النظام</button>
+            <div id="admin-logs-list"></div>
+        </div>
+        
+        <div class="card">
+            <div class="card-title">💰 سجل حركات الصندوق</div>
+            <button onclick="clearSafeTransactions()" style="background-color:#dc2626; width: auto; font-size: 12px; padding: 8px 15px; margin-bottom: 10px;">🗑️ مسح سجل الصندوق</button>
+            <div id="safe-transactions-list" style="max-height:400px; overflow-y:auto; padding-right:5px; margin-bottom:15px; border:1px solid #2e8f0f; border-radius:8px; padding:10px;"></div>
+        </div>
+    </div>
+
+    <!-- ===== LEDGER TAB - مع زر مسح ===== -->
+    <div id="tab-ledger" class="tab-content">
+        <div class="card">
+            <div class="card-title">📚 دفتر الأستاذ العام</div>
+            <button onclick="clearLedger()" style="background-color:#b91c1c; width: auto; font-size: 12px; padding: 8px 15px; margin-bottom: 10px;">🗑️ مسح دفتر الأستاذ</button>
+            <p style="font-size:12px; color:#64748b; margin-bottom:10px;">عرض جميع القيود المحاسبية المسجلة في النظام.</p>
+            <div id="ledger-entries-list" style="max-height:500px; overflow-y:auto;"></div>
+        </div>
+        <div class="card">
+            <div class="card-title">⚖️ ميزان المراجعة</div>
+            <div id="trial-balance-display"></div>
+        </div>
+    </div>
+
+    <!-- Security Tab -->
+    <div id="tab-security" class="tab-content">
+        <div class="card">
+            <div class="card-title">🔐 إعدادات الأمان</div>
+            <p style="font-size:13px; color:#64748b; margin-bottom:12px; line-height:1.8; font-weight:700;">&#x062A;&#x062A;&#x0645; &#x062D;&#x0645;&#x0627;&#x064A;&#x0629; &#x0627;&#x0644;&#x0646;&#x0638;&#x0627;&#x0645; &#x0639;&#x0628;&#x0631; &#x062D;&#x0633;&#x0627;&#x0628; Firebase &#x0627;&#x0644;&#x0645;&#x0635;&#x0631;&#x062D; &#x0641;&#x0642;&#x0637;. &#x0644;&#x062A;&#x063A;&#x064A;&#x064A;&#x0631; &#x0643;&#x0644;&#x0645;&#x0629; &#x0627;&#x0644;&#x0645;&#x0631;&#x0648;&#x0631;&#x060C; &#x0627;&#x0633;&#x062A;&#x062E;&#x062F;&#x0645; &#x0625;&#x0639;&#x062F;&#x0627;&#x062F;&#x0627;&#x062A; Firebase Auth.</p>
+            <button onclick="ABNAuth.logout(event)" style="background:#64748b; margin-top:10px;">🚪 تسجيل خروج</button>
+        </div>
+
+        <div class="card" style="background:#fef2f2; border:1px solid #fecaca;">
+            <div class="card-title" style="color:#991b1b;">🧹 تبييض التطبيق</div>
+            <p style="font-size:13px; color:#7f1d1d; margin-bottom:12px; line-height:1.8; font-weight:700;">
+                هذا الإجراء يمسح كل بيانات التطبيق محلياً ومن السحابة: المنتجات، الفواتير، العملاء، الموردين، الصندوق، السجلات، القيود، طوابير المزامنة، والصور المعلقة. لا يمكن التراجع عنه إلا بوجود نسخة احتياطية.
+            </p>
+            <button onclick="wipeApplication()" style="background:#b91c1c;">🧨 تبييض التطبيق بالكامل</button>
+        </div>
+    </div>
+
+    <!-- System & License Tab -->
+    <div id="tab-system" class="tab-content">
+        <div class="abn-system-hero">
+            <h2>🏷️ ABONIBAL ERP Professional</h2>
+            <p>مركز معلومات المنتج والترخيص. هذه المرحلة تجهّز النسخة التجارية دون تفعيل أي قفل على البرنامج أثناء التطوير.</p>
+            <div class="abn-badge-row">
+                <span class="abn-badge">Edition: <strong id="abn-edition-badge">Professional Foundation</strong></span>
+                <span class="abn-badge">Build: <strong id="abn-build-badge">--</strong></span>
+                <span class="abn-badge">Mode: <strong>Commercial Core</strong></span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">📌 معلومات النظام</div>
+            <div class="abn-commercial-grid">
+                <div class="abn-info-card"><h4>اسم المنتج</h4><strong>ABONIBAL ERP</strong></div>
+                <div class="abn-info-card"><h4>الإصدار التجاري</h4><strong id="abn-edition-name">Professional Foundation</strong></div>
+                <div class="abn-info-card"><h4>رقم البناء</h4><strong id="abn-build-version">--</strong></div>
+                <div class="abn-info-card"><h4>معرّف الجهاز</h4><strong id="abn-device-id">--</strong></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">🔑 مركز الترخيص</div>
+            <div class="abn-license-box">
+                <div class="abn-license-status" id="abn-license-status">🟡 غير مفعل / وضع التطوير</div>
+                <div class="abn-license-input-row">
+                    <input type="text" id="abn-license-key-input" placeholder="أدخل مفتاح الترخيص لاحقًا مثل ABN-PRO-XXXX-XXXX" autocomplete="off" aria-label="مفتاح الترخيص">
+                    <button onclick="ABONIBALCommercial.activateLicenseSoft()" style="background:var(--abn-brand-700);">تفعيل تجريبي</button>
+                </div>
+                <p class="abn-muted-note">في هذه المرحلة لا يتم قفل البرنامج. يتم فقط تجهيز البنية التجارية: Device ID، Edition، License State، ومركز معلومات النظام.</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">🧭 خارطة المنتج</div>
+            <div class="abn-roadmap-list">
+                <div class="abn-roadmap-item"><span>Community</span><span>النسخة الأساسية المستقرة</span></div>
+                <div class="abn-roadmap-item"><span>Professional</span><span>الترخيص، التقارير، الصلاحيات</span></div>
+                <div class="abn-roadmap-item"><span>Enterprise</span><span>الفروع، الإدارة المركزية، API</span></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">📜 دستور العمل الهندسي</div>
+            <div class="abn-governance-grid">
+                <div class="abn-governance-card">
+                    <h4>المنجز المثبت</h4>
+                    <ul>
+                        <li>واجهة Professional Foundation مفعّلة</li>
+                        <li>مركز النظام والترخيص موجود</li>
+                        <li>معرّف الجهاز محفوظ محليًا</li>
+                        <li>استيراد Excel محمي من امتلاء الطابور</li>
+                    </ul>
+                </div>
+                <div class="abn-governance-card">
+                    <h4>مناطق محمية من الكسر</h4>
+                    <ul>
+                        <li>المزامنة و Firebase</li>
+                        <li>الحسابات والصناديق والعملات</li>
+                        <li>الفواتير والمنطق المالي</li>
+                        <li>كلمة المرور والتبييض والاسترجاع</li>
+                    </ul>
+                </div>
+                <div class="abn-governance-card">
+                    <h4>قاعدة كل Sprint</h4>
+                    <ul>
+                        <li>نراجع الموجود قبل التنفيذ</li>
+                        <li>ننفذ الناقص فقط</li>
+                        <li>لا نكرر مهمة منجزة</li>
+                        <li>كل إصدار له فحص قبل التسليم</li>
+                    </ul>
+                </div>
+            </div>
+            <div style="margin-top:10px;">
+                <span class="abn-protected-badge">Single Source of Truth</span>
+                <span class="abn-protected-badge">No Workarounds</span>
+                <span class="abn-protected-badge">Stable Features Protected</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">🧪 فحص جودة سريع</div>
+            <div class="abn-qa-toolbar">
+                <button onclick="ABONIBALGovernance.runSelfReview()" style="background:var(--brand-700, #047857);">تشغيل الفحص</button>
+                <span class="abn-muted-note" id="abn-qa-summary">لم يتم تشغيل الفحص بعد.</span>
+            </div>
+            <div id="abn-qa-results" class="abn-qa-results"></div>
+            <p class="abn-muted-note">هذا الفحص لا يغيّر البيانات. وظيفته كشف الأخطاء البنيوية الواضحة قبل الانتقال إلى Sprint جديد.</p>
+        </div>
+    </div>
+
+</div>
+
+<!-- Client Statement Modal -->
+<div id="client-statement-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.6); z-index:99999; justify-content:center; align-items:center; padding:15px;">
+    <div style="background:white; width:100%; max-width:800px; max-height:90vh; overflow:auto; border-radius:15px; padding:20px; color:#000;">
+        <h2>📋 كشف حساب العميل</h2>
+        <div id="client-statement-content"></div>
+        <button onclick="closeClientStatement()" style="margin-top:15px; background:#ef4444; color:white; padding:10px 20px; border:none; border-radius:8px;">إغلاق</button>
+    </div>
+</div>
+<div id="supplier-statement-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.6); z-index:99999; justify-content:center; align-items:center; padding:15px;">
+    <div style="background:white; width:100%; max-width:800px; max-height:90vh; overflow:auto; border-radius:15px; padding:20px; color:#000;">
+        <h2>🏢 كشف حساب التاجر (المورد)</h2>
+        <div id="supplier-statement-content"></div>
+        <button onclick="closeSupplierStatement()" style="margin-top:15px; background:#64748b; color:white; padding:10px 20px; border:none; border-radius:8px;">إغلاق</button>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- بداية الـ JavaScript المعدل -->
+
+
+
+
+
+
+
+<!-- ============================================================ -->
+<!-- PATCH-004 R2: Excel import quota-safe direct cloud sync -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- ============================================================
+   PRIVACY-001: Business Profile & Personal Data Hardening
+   هدف المرحلة: فصل بيانات المتجر والشركاء عن الكود وجعلها إعدادات محلية قابلة للتعديل.
+   ============================================================ -->
+
+
+
+
+
+
+<!-- ============================================================
+   PRIVACY-002: Firebase Inventory Data Boundary
+   هدف المرحلة: توثيق وفصل بيانات المخزن/المنتجات المرتبطة بـ Firebase عن ملف المتجر الشخصي،
+   وحماية بيانات Firebase من المسح المحلي أو العرض العام.
+   ============================================================ -->
+
+
+
+
+
+<!-- ============================================================
+   PRIVACY-003: Demo/Public Operational Data Masking
+   هدف المرحلة: إخفاء الأرقام التشغيلية والمالية في وضع العرض العام دون تعديل Firebase أو state.
+   ============================================================ -->
+
+
+
+
+
+<!-- ============================================================
+   PRIVACY-004: Demo/Public Product & Inventory List Masking
+   هدف المرحلة: منع ظهور أسماء/صور/أسعار/كميات المنتجات في المخزن ونتائج البحث عند وضع العرض العام،
+   مع بقاء بيانات Firebase و state دون أي تعديل.
+   ============================================================ -->
+
+
+
+
+
+<!-- ============================================================
+   PRIVACY-005: Simplified Public Profile Mode
+   القرار المعتمد: Demo/Public Mode يحمي هوية المتجر فقط.
+   لا يخفي المخزن أو المنتجات أو الكميات أو الأسعار أو القيم التشغيلية.
+   ============================================================ -->
+</body>
+</html>
