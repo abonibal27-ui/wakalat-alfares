@@ -1,0 +1,3 @@
+@media print {
+  #auth-overlay, header, .nav-bar, .sidebar-overlay, #global-spinner { display: none !important; }
+}
