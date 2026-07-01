@@ -118,9 +118,24 @@
     async function p4ProcessExcelRows(rows, onProgress) {
         const changes = [];
         const productMap = new Map();
-        state.products.forEach((p) => {
-            if (p && p.name) productMap.set(String(p.name).trim().toLowerCase(), p);
-        });
+        function registerProduct(product) {
+            if (!product) return;
+            if (typeof getProductIdentityKeys === 'function') {
+                getProductIdentityKeys(product).forEach(key => productMap.set(key, product));
+            } else if (product.name) {
+                productMap.set(String(product.name).trim().toLowerCase(), product);
+            }
+        }
+        function findExistingProduct(draft) {
+            if (typeof getProductIdentityKeys === 'function') {
+                const keys = getProductIdentityKeys(draft);
+                for (const key of keys) {
+                    if (productMap.has(key)) return productMap.get(key);
+                }
+            }
+            return productMap.get(String(draft.name || '').trim().toLowerCase()) || null;
+        }
+        state.products.forEach(registerProduct);
 
         let addedCount = 0;
         let updatedCount = 0;
@@ -135,14 +150,14 @@
                 if (!rawName) continue;
                 const name = String(rawName).trim();
                 if (!name) continue;
-                const key = name.toLowerCase();
                 const category = String(p4Cell(row, ['القسم', 'الصنف', 'category'], state.categories[0] || 'عام')).trim() || 'عام';
                 const cost = Number(parseFloat(p4Cell(row, ['سعر الشراء', 'تكلفة الشراء', 'cost'], 0)) || 0);
                 const wholesale = Number(parseFloat(p4Cell(row, ['سعر الجملة', 'wholesale'], 0)) || 0);
                 const retail = Number(parseFloat(p4Cell(row, ['سعر المفرق', 'retail'], 0)) || 0);
                 const incomingStock = parseInt(p4Cell(row, ['الكمية', 'الكمية المتوفرة', 'stock'], 0)) || 0;
 
-                const existing = productMap.get(key);
+                const draft = { name, category, cost, wholesale, retail };
+                const existing = findExistingProduct(draft);
                 if (existing) {
                     existing.cost = Number(cost.toFixed(2));
                     existing.wholesale = Number(wholesale.toFixed(2));
@@ -171,7 +186,7 @@
                         _deviceId: DEVICE_ID
                     };
                     state.products.unshift(newProd);
-                    productMap.set(key, newProd);
+                    registerProduct(newProd);
                     p4QueueChange(changes, 'products', newId, 'create', newProd);
                     p4AddTrackRecord(changes, newId, name, 'إضافة', incomingStock, 'استيراد قطعة جديدة من إكسيل');
                     addedCount++;
@@ -181,6 +196,9 @@
             await new Promise(resolve => setTimeout(resolve, 0));
         }
 
+        if (typeof dedupeProductsSafe === 'function') {
+            state.products = dedupeProductsSafe(state.products, { source: 'excel-import', log: false }).products;
+        }
         if (state.itemTracks.length > 2000) state.itemTracks.length = 2000;
         return { addedCount, updatedCount, changes };
     }
@@ -383,7 +401,7 @@
    ============================================================ */
 (function(){
     const VERSION = 'PATCH-006-STABILIZATION-P2';
-    const protectedModules = ['sync', 'database', 'accounting', 'invoice-logic', 'security', 'excel-import'];
+    const protectedModules = ['sync', 'database', 'accounting', 'invoice-logic', 'maintenance', 'excel-import'];
     const completed = [
         'direct-product-search',
         'professional-ui-foundation',
@@ -978,7 +996,7 @@
         'itemTracks', 'partnerWithdrawals', 'exchanges', 'capitalRecords', 'adminLogs',
         'safeTransactions', 'ledgerEntries'
     ];
-    const OBJECT_FIELDS = ['rates', 'safes', 'security'];
+    const OBJECT_FIELDS = ['rates', 'safes'];
     const SPLIT_KEY_BY_FIELD = {
         products: 'PRODUCTS',
         clients: 'CLIENTS',
@@ -1054,7 +1072,6 @@
 
         appState.rates = objectValue(appState.rates, { try: 0, syp: 0 });
         appState.safes = objectValue(appState.safes, { usd: 0, try: 0, syp: 0 });
-        if (appState.security !== undefined) appState.security = objectValue(appState.security, {});
 
         appState.invoiceCount = Math.max(1, numberValue(appState.invoiceCount, 150));
         appState.syncVersion = Math.max(0, numberValue(appState.syncVersion, 0));
@@ -1073,7 +1090,6 @@
         ARRAY_FIELDS.forEach(function(field){ data[field] = cloneSafe(arrayValue(appState[field])); });
         data.rates = cloneSafe(objectValue(appState.rates, { try: 0, syp: 0 }));
         data.safes = cloneSafe(objectValue(appState.safes, { usd: 0, try: 0, syp: 0 }));
-        data.security = cloneSafe(objectValue(appState.security, {}));
         data.invoiceCount = numberValue(appState.invoiceCount, 150);
         data.syncVersion = numberValue(appState.syncVersion, 0);
         data.lastSyncTime = appState.lastSyncTime || null;
@@ -1101,7 +1117,6 @@
         if (!appState.categories.length) appState.categories = DEFAULT_CATEGORIES.slice();
         appState.rates = objectValue(data.rates, { try: 0, syp: 0 });
         appState.safes = objectValue(data.safes, { usd: 0, try: 0, syp: 0 });
-        if (data.security || appState.security) appState.security = objectValue(data.security || appState.security, {});
         appState.invoiceCount = Math.max(1, numberValue(data.invoiceCount, 150));
         appState.syncVersion = Math.max(0, numberValue(data.syncVersion, 0));
         appState.lastSyncTime = data.lastSyncTime || null;
@@ -1148,7 +1163,6 @@
             capitalRecords: arrayValue(data.capitalRecords),
             invoiceCount: numberValue(data.invoiceCount, 150),
             adminLogs: arrayValue(data.adminLogs),
-            security: objectValue(data.security, {})
         };
         if (keys.OTHER_DATA) operations.push(localforage.setItem(keys.OTHER_DATA, otherData));
         if (keys.SYNC_VERSION) operations.push(localforage.setItem(keys.SYNC_VERSION, numberValue(data.syncVersion, 0)));
@@ -1725,6 +1739,7 @@ function importProfileFile(file){
     reader.readAsText(file, 'utf-8');
 }
 async function clearCurrentDevice(){
+    if (typeof window.clearCurrentDeviceData === 'function') return window.clearCurrentDeviceData();
     const phrase = 'مسح بيانات الجهاز الحالي';
     const typed = prompt('هذا الإجراء يمسح بيانات هذا الجهاز فقط ولا يمسح Firebase. اكتب العبارة التالية للتأكيد:\n' + phrase);
     if (typed !== phrase) return alert('تم إلغاء المسح.');
@@ -2674,7 +2689,7 @@ try { console.info('[ABONIBAL Privacy P6] ' + VERSION + ' loaded', window.ABNPri
     }
 
     function protectLegacyWipeUi(){
-        var legacyBtn = document.querySelector('#tab-security button[onclick*="wipeApplication"]');
+        var legacyBtn = document.querySelector('#tab-maintenance button[onclick*="wipeApplication"]');
         if (!legacyBtn) return false;
         legacyBtn.textContent = '🛡️ التبييض السحابي معطل في Production';
         legacyBtn.style.background = '#64748b';

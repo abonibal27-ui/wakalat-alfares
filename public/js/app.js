@@ -117,13 +117,19 @@ function currencySymbol(value) {
 
 function formatCurrencyAmount(amount, currency, sign = '') {
     const code = currencyCode(currency, 'usd');
-    const n = Number(amount) || 0;
+    return `${sign}${formatPrice(amount, code)}`;
+}
+
+function formatPrice(value, currency = 'usd') {
+    const code = currencyCode(currency, 'usd');
+    const n = Number(value);
+    const safe = Number.isFinite(n) ? n : 0;
     const decimals = code === 'usd' ? 2 : 0;
-    return `${sign}${n.toFixed(decimals)} ${currencySymbol(code)}`;
+    return `${safe.toFixed(decimals)} ${currencySymbol(code)}`;
 }
 
 function formatUsdEquivalent(value) {
-    const n = Number(value) || 0;
+    const n = Number.isFinite(Number(value)) ? Number(value) : 0;
     return `يعادل $${n.toFixed(2)}`;
 }
 
@@ -147,31 +153,267 @@ function mergeById(localArr, cloudArr) {
     return Array.from(map.values());
 }
 
-function cleanProductsData(productsList) {
-    let arr = forceArray(productsList);
-    if (arr.length === 0) return [];
-    const uniqueProducts = new Map();
-    arr.forEach(product => {
+const PRODUCT_IDENTITY_FIELDS = ['code', 'barcode', 'partNumber', 'part_number', 'sku'];
+const PRODUCT_NUMERIC_FIELDS = ['cost', 'wholesale', 'retail', 'stock'];
+const PRODUCT_MAINTENANCE_VERSION = 'PRODUCTS_DEDUPE_V1';
+
+function normalizeProductText(value) {
+    const digitMap = {
+        '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4', '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9',
+        '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4', '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9'
+    };
+    return String(value ?? '')
+        .normalize('NFKC')
+        .replace(/[٠-٩۰-۹]/g, ch => digitMap[ch] || ch)
+        .toLowerCase()
+        .replace(/[^\w\u0600-\u06FF\s]+/g, ' ')
+        .replace(/_/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function normalizeProductCode(value) {
+    return normalizeProductText(value).replace(/\s+/g, '');
+}
+
+function stableHash(value) {
+    const text = String(value || '');
+    let hash = 2166136261;
+    for (let i = 0; i < text.length; i++) {
+        hash ^= text.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(36);
+}
+
+function roundMoney(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 0;
+    return Math.round(n * 100) / 100;
+}
+
+function normalizeLegacyNumber(value, integer = false) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 0;
+    const normalized = integer ? Math.trunc(n) : roundMoney(n);
+    return normalized < 0 ? 0 : normalized;
+}
+
+function getProductIdentityKeys(product) {
+    if (!product || typeof product !== 'object') return [];
+    const keys = [];
+    PRODUCT_IDENTITY_FIELDS.forEach(field => {
+        const normalized = normalizeProductCode(product[field]);
+        if (normalized) keys.push(`${field}:${normalized}`);
+    });
+
+    const name = normalizeProductText(product.name);
+    const category = normalizeProductText(product.category);
+    if (name && category) {
+        keys.push(`name-category:${name}|${category}`);
+        const cost = roundMoney(product.cost);
+        const retail = roundMoney(product.retail);
+        if (cost || retail) keys.push(`name-category-price:${name}|${category}|${cost}|${retail}`);
+    } else if (name) {
+        keys.push(`name:${name}`);
+    }
+
+    if (product.id) keys.push(`id:${String(product.id)}`);
+    return Array.from(new Set(keys));
+}
+
+function createStableProductId(product, index = 0) {
+    if (product && product.id) return String(product.id);
+    const keys = getProductIdentityKeys(product).filter(key => !key.startsWith('id:'));
+    const basis = keys[0] || JSON.stringify([
+        normalizeProductText(product && product.name),
+        normalizeProductText(product && product.category),
+        roundMoney(product && product.cost),
+        roundMoney(product && product.wholesale),
+        roundMoney(product && product.retail),
+        normalizeLegacyNumber(product && product.stock, true),
+        index
+    ]);
+    return `prod_${stableHash(basis)}`;
+}
+
+function normalizeProductRecord(product, index = 0, fallbackId = '') {
+    if (!product || typeof product !== 'object') return null;
+    const normalized = { ...product };
+    const hasIdentity = Boolean(normalized.id || normalized.name || normalized.code || normalized.barcode || normalized.partNumber || normalized.sku);
+    if (!hasIdentity) return null;
+
+    normalized.id = String(normalized.id || fallbackId || createStableProductId(normalized, index));
+    PRODUCT_NUMERIC_FIELDS.forEach(field => {
+        normalized[field] = normalizeLegacyNumber(normalized[field], field === 'stock');
+    });
+    normalized.version = Math.max(1, normalizeLegacyNumber(normalized.version, true) || 1);
+    normalized._updatedAt = Number.isFinite(Number(normalized._updatedAt || normalized.timestamp))
+        ? Number(normalized._updatedAt || normalized.timestamp)
+        : 0;
+    if (!normalized.category) normalized.category = state.categories && state.categories[0] ? state.categories[0] : 'General';
+    normalized.__hadProductId = Boolean(product.id || fallbackId);
+    return normalized;
+}
+
+function productCompletenessScore(product) {
+    if (!product) return 0;
+    let score = 0;
+    ['name', 'category', 'cost', 'wholesale', 'retail', 'stock', 'image', 'code', 'barcode', 'partNumber', 'sku'].forEach(field => {
+        const value = product[field];
+        if (value !== undefined && value !== null && String(value).trim() !== '') score++;
+    });
+    if (product.image && !product.imageUploadPending) score += 3;
+    if (product.__hadProductId) score += 2;
+    return score;
+}
+
+function chooseBestProductVersion(a, b) {
+    if (!a) return b;
+    if (!b) return a;
+    const checks = [
+        [Number(a._updatedAt) || 0, Number(b._updatedAt) || 0],
+        [Number(a.version) || 0, Number(b.version) || 0],
+        [a.image && !a.imageUploadPending ? 1 : 0, b.image && !b.imageUploadPending ? 1 : 0],
+        [productCompletenessScore(a), productCompletenessScore(b)]
+    ];
+    for (const [av, bv] of checks) {
+        if (av !== bv) return av > bv ? a : b;
+    }
+    return a.__hadProductId && !b.__hadProductId ? a : b;
+}
+
+function mergeProductRecords(best, duplicate) {
+    const merged = { ...best };
+    Object.keys(duplicate || {}).forEach(key => {
+        if (key.startsWith('__')) return;
+        const current = merged[key];
+        const incoming = duplicate[key];
+        const currentMissing = current === undefined || current === null || String(current).trim() === '';
+        const incomingPresent = incoming !== undefined && incoming !== null && String(incoming).trim() !== '';
+        if (currentMissing && incomingPresent) merged[key] = incoming;
+    });
+    PRODUCT_NUMERIC_FIELDS.forEach(field => {
+        merged[field] = normalizeLegacyNumber(best[field], field === 'stock');
+    });
+    merged.version = Math.max(Number(best.version) || 1, Number(duplicate && duplicate.version) || 1);
+    merged._updatedAt = Math.max(Number(best._updatedAt) || 0, Number(duplicate && duplicate._updatedAt) || 0);
+    merged.id = best.id || duplicate.id || createStableProductId(merged);
+    merged.__hadProductId = Boolean(best.__hadProductId || duplicate.__hadProductId);
+    return merged;
+}
+
+function finalizeProductRecord(product) {
+    const clean = { ...product };
+    delete clean.__hadProductId;
+    PRODUCT_NUMERIC_FIELDS.forEach(field => {
+        clean[field] = normalizeLegacyNumber(clean[field], field === 'stock');
+    });
+    clean.version = Math.max(1, normalizeLegacyNumber(clean.version, true) || 1);
+    clean._updatedAt = Number.isFinite(Number(clean._updatedAt)) ? Number(clean._updatedAt) : Date.now();
+    clean.id = String(clean.id || createStableProductId(clean));
+    return clean;
+}
+
+function dedupeProductsSafe(products, options = {}) {
+    const source = options.source || 'unknown';
+    const input = forceArray(products);
+    const groups = new Map();
+    const identityMap = new Map();
+    let groupSeq = 0;
+
+    function mergeGroups(targetId, sourceId) {
+        if (targetId === sourceId || !groups.has(targetId) || !groups.has(sourceId)) return targetId;
+        const target = groups.get(targetId);
+        const sourceGroup = groups.get(sourceId);
+        sourceGroup.items.forEach(item => target.items.push(item));
+        sourceGroup.keys.forEach(key => {
+            target.keys.add(key);
+            identityMap.set(key, targetId);
+        });
+        const best = chooseBestProductVersion(target.best, sourceGroup.best);
+        const duplicate = best === target.best ? sourceGroup.best : target.best;
+        target.best = mergeProductRecords(best, duplicate);
+        groups.delete(sourceId);
+        return targetId;
+    }
+
+    input.forEach((raw, index) => {
+        const product = normalizeProductRecord(raw, index);
         if (!product) return;
-        let buyPrice = parseFloat(product.cost || 0);
-        if (buyPrice >= 0) {
-            let uniqueKey = product.id;
-            if (uniqueProducts.has(uniqueKey)) {
-                let existing = uniqueProducts.get(uniqueKey);
-                existing.cost = Math.max(existing.cost, product.cost);
-                existing.wholesale = Math.max(existing.wholesale, product.wholesale);
-                existing.retail = Math.max(existing.retail, product.retail);
-                existing.stock += Number(product.stock || 0);
-                existing.version = Math.max(existing.version || 0, product.version || 0);
-                existing._updatedAt = Math.max(existing._updatedAt || 0, product._updatedAt || 0);
-            } else {
-                if (!product.version) product.version = 1;
-                if (!product._updatedAt) product._updatedAt = Date.now();
-                uniqueProducts.set(uniqueKey, product);
-            }
+        const keys = getProductIdentityKeys(product);
+        if (!keys.length) keys.push(`id:${product.id}`);
+        const matched = Array.from(new Set(keys.map(key => identityMap.get(key)).filter(Boolean)));
+        let groupId = matched[0];
+        if (!groupId) {
+            groupId = `g${++groupSeq}`;
+            groups.set(groupId, { keys: new Set(), items: [], best: null });
+        } else if (matched.length > 1) {
+            matched.slice(1).forEach(id => { groupId = mergeGroups(groupId, id); });
+        }
+
+        const group = groups.get(groupId);
+        keys.forEach(key => {
+            group.keys.add(key);
+            identityMap.set(key, groupId);
+        });
+        group.items.push(product);
+        const best = chooseBestProductVersion(group.best, product);
+        const duplicate = best === group.best ? product : group.best;
+        group.best = duplicate ? mergeProductRecords(best, duplicate) : best;
+    });
+
+    const duplicateGroups = [];
+    const productsOut = [];
+    groups.forEach(group => {
+        const best = finalizeProductRecord(group.best);
+        productsOut.push(best);
+        if (group.items.length > 1) {
+            duplicateGroups.push({
+                key: Array.from(group.keys)[0] || best.id,
+                kept: { id: best.id, name: best.name || '' },
+                removed: group.items
+                    .filter(item => String(item.id) !== String(best.id) || item !== group.best)
+                    .slice(0, 6)
+                    .map(item => ({ id: item.id, name: item.name || '' })),
+                count: group.items.length
+            });
         }
     });
-    return Array.from(uniqueProducts.values());
+
+    productsOut.sort((a, b) => (Number(b._updatedAt) || 0) - (Number(a._updatedAt) || 0) || String(a.name || '').localeCompare(String(b.name || ''), 'ar'));
+    const report = {
+        source,
+        products: productsOut,
+        totalBefore: input.length,
+        totalAfter: productsOut.length,
+        duplicateGroups: duplicateGroups.length,
+        removedDuplicates: Math.max(0, input.length - productsOut.length),
+        examples: duplicateGroups.slice(0, 5)
+    };
+    if (report.removedDuplicates && options.log !== false) console.warn('Product dedupe report:', report);
+    return report;
+}
+
+function replaceProductsFromSource(products, source = 'unknown') {
+    const report = dedupeProductsSafe(products, { source });
+    state.products = report.products;
+    return report;
+}
+
+function findProductIndexByIdentity(product, fallbackId = '') {
+    const incoming = normalizeProductRecord(product, 0, fallbackId);
+    if (!incoming) return -1;
+    const incomingKeys = new Set(getProductIdentityKeys(incoming));
+    return state.products.findIndex(existing => {
+        if (!existing) return false;
+        if (incoming.id && String(existing.id) === String(incoming.id)) return true;
+        return getProductIdentityKeys(existing).some(key => incomingKeys.has(key));
+    });
+}
+
+function cleanProductsData(productsList) {
+    return dedupeProductsSafe(productsList, { source: 'cleanProductsData' }).products;
 }
 
 // ============================================================
@@ -243,7 +485,7 @@ async function loadFromLocal() {
         const syncVersion = await localforage.getItem(STORAGE_KEYS.SYNC_VERSION) || 0;
         const lastSyncTime = await localforage.getItem(STORAGE_KEYS.LAST_SYNC_TIME) || null;
 
-        state.products = products;
+        replaceProductsFromSource(products, 'loadFromLocal');
         state.clients = clients;
         state.invoices = invoices;
         state.retailSales = retailSales;
@@ -263,14 +505,6 @@ async function loadFromLocal() {
         state.invoiceCount = other.invoiceCount || 150;
         state.adminLogs = other.adminLogs || [];
         normalizeStateForLegacyData();
-
-        // ===== إصلاح: التأكد من أن كل منتج له معرف =====
-        state.products.forEach(p => {
-            if (p && !p.id) {
-                p.id = generateUniqueID();
-                console.log('✅ تم إضافة ID للمنتج (loadFromLocal):', p.name);
-            }
-        });
 
         return true;
     } catch (error) {
@@ -476,8 +710,10 @@ function arrayToObjectById(arr) {
 }
 
 function buildCloudStateSnapshot() {
+    const productReport = dedupeProductsSafe(state.products, { source: 'buildCloudStateSnapshot', log: false });
+    state.products = productReport.products;
     return {
-        products: arrayToObjectById(state.products),
+        products: arrayToObjectById(productReport.products),
         clients: arrayToObjectById(state.clients),
         invoices: arrayToObjectById(state.invoices),
         retailSales: arrayToObjectById(state.retailSales),
@@ -529,7 +765,15 @@ function dataURLToBlob(dataURL) {
 async function queueImageUpload(entityId, dataURL) {
     const pending = await getPendingImageUploads();
     const filtered = pending.filter(item => item.entityId !== entityId);
-    filtered.push({ id: generateUniqueID(), entityId, dataURL, createdAt: Date.now(), attempts: 0 });
+    const product = state.products.find(item => item && String(item.id) === String(entityId));
+    filtered.push({
+        id: generateUniqueID(),
+        entityId,
+        identityKeys: product ? getProductIdentityKeys(product) : [],
+        dataURL,
+        createdAt: Date.now(),
+        attempts: 0
+    });
     await savePendingImageUploads(filtered);
 }
 
@@ -614,7 +858,16 @@ SyncManager.processPendingImages = async function () {
     let processed = 0;
     const remaining = [];
     for (const item of pending) {
-        const product = state.products.find(p => p.id === item.entityId);
+        const now = Date.now();
+        if (item.nextRetryAt && Number(item.nextRetryAt) > now) {
+            remaining.push(item);
+            continue;
+        }
+        let product = state.products.find(p => p && String(p.id) === String(item.entityId));
+        if (!product && Array.isArray(item.identityKeys) && item.identityKeys.length) {
+            const keys = new Set(item.identityKeys);
+            product = state.products.find(p => p && getProductIdentityKeys(p).some(key => keys.has(key)));
+        }
         if (!product) {
             processed++;
             continue;
@@ -631,7 +884,8 @@ SyncManager.processPendingImages = async function () {
         } catch (error) {
             item.attempts = (item.attempts || 0) + 1;
             item.lastError = error.message;
-            item.lastAttemptAt = Date.now();
+            item.lastAttemptAt = now;
+            item.nextRetryAt = now + Math.min(60 * 60 * 1000, Math.pow(2, Math.min(item.attempts, 6)) * 30 * 1000);
             remaining.push(item);
         }
     }
@@ -639,6 +893,41 @@ SyncManager.processPendingImages = async function () {
     if (processed) await saveToLocal();
     return processed;
 };
+
+async function applyRemoteProductChange(change) {
+    if (!change || change.collection !== 'products') return false;
+
+    if (change.operation === 'delete') {
+        state.products = state.products.filter(item => item && String(item.id) !== String(change.entityId));
+        return true;
+    }
+
+    if (change.operation !== 'create' && change.operation !== 'update') return false;
+    const incoming = normalizeProductRecord(change.data || {}, 0, change.entityId);
+    if (!incoming) return false;
+
+    const idx = findProductIndexByIdentity(incoming, change.entityId);
+    if (idx >= 0) {
+        const local = state.products[idx];
+        const localTime = Number(local._updatedAt || local.timestamp || 0);
+        const incomingTime = Number(incoming._updatedAt || incoming.timestamp || change.timestamp || 0);
+        const localHasPending = SyncQueue.items.some(q =>
+            !q.synced &&
+            q.collection === 'products' &&
+            (String(q.entityId) === String(local.id) || String(q.entityId) === String(change.entityId))
+        );
+        if (localHasPending && localTime > incomingTime) return false;
+
+        const best = chooseBestProductVersion(local, incoming);
+        const duplicate = best === local ? incoming : local;
+        state.products[idx] = finalizeProductRecord(mergeProductRecords(best, duplicate));
+    } else {
+        state.products.unshift(finalizeProductRecord(incoming));
+    }
+
+    state.products = dedupeProductsSafe(state.products, { source: 'remote-product-change' }).products;
+    return true;
+}
 
 SyncManager.applyRemoteChanges = async function (cloudChangesArray) {
     let appliedCount = 0;
@@ -673,6 +962,10 @@ SyncManager.applyRemoteChange = async function (change) {
     } else if (change.collection === 'system' && change.entityId === 'invoiceCount') {
         state.invoiceCount = Math.max(Number(state.invoiceCount) || 0, Number(change.data) || 0);
     } else if (ROOT_COLLECTIONS.has(change.collection)) {
+        if (change.collection === 'products') {
+            const applied = await applyRemoteProductChange(change);
+            if (!applied) return false;
+        } else {
         const target = state[change.collection];
         if (!Array.isArray(target)) return false;
         const idx = target.findIndex(item => item && String(item.id) === String(change.entityId));
@@ -692,6 +985,7 @@ SyncManager.applyRemoteChange = async function (change) {
             }
         } else {
             return false;
+        }
         }
     } else {
         return false;
@@ -780,7 +1074,7 @@ async function fullSync() {
         }
 
         // ===== إصلاح: دمج البيانات بدلاً من استبدالها =====
-        state.products = mergeById(state.products, backup.products || []);
+        replaceProductsFromSource(backup.products || [], 'fullSync');
         state.clients = mergeById(state.clients, backup.clients || []);
         state.invoices = mergeById(state.invoices, backup.invoices || []);
         state.safes = { ...state.safes, ...(backup.safes || {}) };
@@ -808,7 +1102,7 @@ async function pullFromCloud__legacyMerge() {
 
         if (data) {
             // ===== إصلاح جذري: الدمج بدلاً من الاستبدال =====
-            if (data.products) state.products = mergeById(state.products, cleanProductsData(data.products));
+            replaceProductsFromSource(data.products !== undefined ? data.products : (data.full_backup && data.full_backup.products) || [], 'pullFromCloud-legacy');
             if (data.categories) state.categories = forceArray(data.categories);
             if (data.clients) state.clients = mergeById(state.clients, forceArray(data.clients));
             if (data.suppliers) state.suppliers = mergeById(state.suppliers, forceArray(data.suppliers));
@@ -825,14 +1119,6 @@ async function pullFromCloud__legacyMerge() {
             if (data.invoiceCount) state.invoiceCount = data.invoiceCount;
             state.lastSyncTime = data.lastSyncTime || 0;
             normalizeStateForLegacyData();
-
-            // ===== إصلاح: التأكد من أن كل منتج له معرف بعد السحب =====
-            state.products.forEach(p => {
-                if (p && !p.id) {
-                    p.id = generateUniqueID();
-                    console.log('✅ تم إضافة ID للمنتج (pullFromCloud):', p.name);
-                }
-            });
 
             await saveToLocal();
             updateAllUI();
@@ -1295,9 +1581,9 @@ function renderProductSearchResults(containerId, products, onSelectFnName) {
     container.innerHTML = products.map(p => {
         const id = escapeHtml(p.id);
         const name = escapeHtml(p.name || 'بدون اسم');
-        const price = Number(p.retail || 0);
+        const price = formatPrice(p.retail, 'usd');
         const stock = Number(p.stock || 0);
-        return `<div class="product-search-result-item" onclick="${onSelectFnName}('${id}')">${name}<span class="product-search-result-meta">السعر: $${price} - المتوفر: ${stock}</span></div>`;
+        return `<div class="product-search-result-item" onclick="${onSelectFnName}('${id}')">${name}<span class="product-search-result-meta">السعر: ${price} - المتوفر: ${stock}</span></div>`;
     }).join('');
     container.style.display = 'block';
 }
@@ -2061,7 +2347,7 @@ function updateProductsUI() {
         if (!p) return;
         const img = p.image ? `<img src="${p.image}" class="product-img-thumbnail">` : `<div class="product-img-thumbnail" style="line-height:50px; text-align:center; font-size:10px; background:#e2e8f0;">بدون</div>`;
         let alertTag = p.stock <= 3 ? `<span style="color:red; font-size:10px; font-weight:bold;">⚠️ منخفض (${p.stock})</span>` : '';
-        html += `<div class="data-list-item"><div style="display:flex; align-items:center;">${img}<div style="margin-right:10px;"><strong>${p.name}</strong><br><small>${p.category} | متوفر: ${p.stock} ${alertTag} | v${p.version || 1}</small></div></div><div style="text-align: left;"><div style="display:flex; gap:4px; margin-bottom:5px; font-size:11px;"><span style="background:#e2e8f0; padding:2px 4px; border-radius:4px;">ش:${Number(p.cost || 0).toFixed(2)}$</span><span style="background:#e2e8f0; padding:2px 4px; border-radius:4px;">ج:${Number(p.wholesale || 0).toFixed(2)}$</span><span style="background:#e2e8f0; padding:2px 4px; border-radius:4px;">م:${Number(p.retail || 0).toFixed(2)}$</span></div><div><button class="action-btn" style="background:#2563eb; color:white; border:none;" onclick="editProduct('${p.id}')">تعديل</button> <button class="action-btn" style="background:#ef4444; color:white; border:none;" onclick="deleteProduct('${p.id}')">❌</button></div></div></div>`;
+        html += `<div class="data-list-item"><div style="display:flex; align-items:center;">${img}<div style="margin-right:10px;"><strong>${p.name}</strong><br><small>${p.category} | متوفر: ${p.stock} ${alertTag} | v${p.version || 1}</small></div></div><div style="text-align: left;"><div style="display:flex; gap:4px; margin-bottom:5px; font-size:11px;"><span style="background:#e2e8f0; padding:2px 4px; border-radius:4px;">ش:${formatPrice(p.cost, 'usd')}</span><span style="background:#e2e8f0; padding:2px 4px; border-radius:4px;">ج:${formatPrice(p.wholesale, 'usd')}</span><span style="background:#e2e8f0; padding:2px 4px; border-radius:4px;">م:${formatPrice(p.retail, 'usd')}</span></div><div><button class="action-btn" style="background:#2563eb; color:white; border:none;" onclick="editProduct('${p.id}')">تعديل</button> <button class="action-btn" style="background:#ef4444; color:white; border:none;" onclick="deleteProduct('${p.id}')">❌</button></div></div></div>`;
     });
     list.innerHTML = html;
 
@@ -2169,6 +2455,47 @@ function updateCategoriesUI() {
 // ============================================================
 let editingProductId = null;
 
+function readNumberInputStrict(id, label, options = {}) {
+    const el = document.getElementById(id);
+    const raw = String(el && el.value !== undefined ? el.value : '').trim();
+    const required = options.required !== false;
+    const min = Number.isFinite(Number(options.min)) ? Number(options.min) : 0;
+    if (!raw) {
+        if (!required) return { ok: true, value: 0 };
+        return { ok: false, error: `${label}: value is required` };
+    }
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return { ok: false, error: `${label}: invalid number` };
+    if (n < min) return { ok: false, error: `${label}: must be ${min} or higher` };
+    const value = options.integer ? Math.trunc(n) : roundMoney(n);
+    return { ok: true, value };
+}
+
+function readProductFormValues() {
+    const name = document.getElementById('prod-name').value.trim();
+    const category = document.getElementById('prod-category').value;
+    const checks = [
+        readNumberInputStrict('prod-cost', 'Purchase price'),
+        readNumberInputStrict('prod-wholesale', 'Wholesale price'),
+        readNumberInputStrict('prod-retail', 'Retail price'),
+        readNumberInputStrict('prod-stock', 'Stock', { integer: true })
+    ];
+    const errors = checks.filter(item => !item.ok).map(item => item.error);
+    if (!name) errors.unshift('Product name is required');
+    if (errors.length) return { ok: false, errors };
+    return {
+        ok: true,
+        value: {
+            name,
+            category,
+            cost: checks[0].value,
+            wholesale: checks[1].value,
+            retail: checks[2].value,
+            stock: checks[3].value
+        }
+    };
+}
+
 async function uploadImageToCloudinary(imageFile) {
     const formData = new FormData();
     formData.append("file", imageFile);
@@ -2191,16 +2518,10 @@ async function uploadImageToCloudinary(imageFile) {
 }
 
 async function saveProduct() {
-    const name = document.getElementById('prod-name').value.trim();
-    const category = document.getElementById('prod-category').value;
-
-    const cost = parseFloat(Number(document.getElementById('prod-cost').value || 0).toFixed(2));
-    const wholesale = parseFloat(Number(document.getElementById('prod-wholesale').value || 0).toFixed(2));
-    const retail = parseFloat(Number(document.getElementById('prod-retail').value || 0).toFixed(2));
-    const stock = parseInt(document.getElementById('prod-stock').value) || 0;
+    const form = readProductFormValues();
+    if (!form.ok) return alert(form.errors.join('\n'));
+    const { name, category, cost, wholesale, retail, stock } = form.value;
     const imageFile = document.getElementById('prod-image').files[0];
-
-    if (!name) return alert("الرجاء إدخال اسم القطعة");
 
     const btn = document.getElementById('save-prod-btn');
     const originalBtnText = btn.innerText;
@@ -2253,11 +2574,31 @@ async function saveProduct() {
                 _updatedAt: Date.now(),
                 _deviceId: DEVICE_ID
             };
-            if (pendingImageDataURL) await queueImageUpload(newId, pendingImageDataURL);
-            state.products.unshift(newProduct);
-            trackChange('products', newId, 'create', newProduct);
-            addTrackRecord(newId, name, 'إضافة', stock, 'إضافة قطعة جديدة للمخزن');
-            addAdminLog("إضافة قطعة", `تم إضافة قطعة جديدة: ${name}`);
+            const existingIndex = findProductIndexByIdentity(newProduct, newId);
+            if (existingIndex >= 0) {
+                const existing = state.products[existingIndex];
+                const oldStock = Number(existing.stock) || 0;
+                const updatedProduct = {
+                    ...existing,
+                    ...newProduct,
+                    id: existing.id,
+                    image: imageUrl || existing.image || "",
+                    version: (Number(existing.version) || 0) + 1,
+                    _updatedAt: Date.now(),
+                    _deviceId: DEVICE_ID
+                };
+                state.products[existingIndex] = updatedProduct;
+                if (pendingImageDataURL) await queueImageUpload(existing.id, pendingImageDataURL);
+                trackChange('products', existing.id, 'update', updatedProduct);
+                if (stock !== oldStock) addTrackRecord(existing.id, name, 'تعديل', stock - oldStock, 'تحديث منتج موجود بنفس الهوية');
+                addAdminLog("تحديث قطعة", `تم تحديث قطعة موجودة بنفس الهوية: ${name}`);
+            } else {
+                if (pendingImageDataURL) await queueImageUpload(newId, pendingImageDataURL);
+                state.products.unshift(newProduct);
+                trackChange('products', newId, 'create', newProduct);
+                addTrackRecord(newId, name, 'إضافة', stock, 'إضافة قطعة جديدة للمخزن');
+                addAdminLog("إضافة قطعة", `تم إضافة قطعة جديدة: ${name}`);
+            }
         }
 
         await saveToLocal();
@@ -3377,6 +3718,7 @@ function importFromExcel(event) {
                     }
                 }
             });
+            state.products = dedupeProductsSafe(state.products, { source: 'legacy-excel-import', log: false }).products;
             
             saveToLocal();
             updateProductsUI();
@@ -3397,10 +3739,15 @@ function saveBulkProducts() {
     if (!text) return alert("الرجاء إدخال أسماء القطع");
     
     const category = document.getElementById('bulk-category').value;
-    const cost = parseFloat(Number(document.getElementById('bulk-cost').value || 0).toFixed(2));
-    const wholesale = parseFloat(Number(document.getElementById('bulk-wholesale').value || 0).toFixed(2));
-    const retail = parseFloat(Number(document.getElementById('bulk-retail').value || 0).toFixed(2));
-    const stock = parseInt(document.getElementById('bulk-stock').value) || 0;
+    const checks = [
+        readNumberInputStrict('bulk-cost', 'Bulk purchase price'),
+        readNumberInputStrict('bulk-wholesale', 'Bulk wholesale price'),
+        readNumberInputStrict('bulk-retail', 'Bulk retail price'),
+        readNumberInputStrict('bulk-stock', 'Bulk stock', { integer: true })
+    ];
+    const errors = checks.filter(item => !item.ok).map(item => item.error);
+    if (errors.length) return alert(errors.join('\n'));
+    const [cost, wholesale, retail, stock] = checks.map(item => item.value);
 
     const lines = text.split('\n');
     let addedCount = 0;
@@ -3433,48 +3780,317 @@ if (navigator.onLine) {
 }
 
 function resetAllStock() {
-    if (!confirm("⚠️ تحذير: سيتم تصفير كميات جميع القطع إلى صفر. هل أنت متأكد تماماً؟")) return;
-    if (!confirm("تأكيد أخير: هل تريد حقاً مسح كميات كل المخزن؟")) return;
-    
-    state.products.forEach(p => { 
-        if(p) {
-            p.stock = 0; 
-            p.version = (p.version || 0) + 1;
-            p._updatedAt = Date.now();
-            trackChange('products', p.id, 'update', p);
-        }
-    });
-    saveToLocal();
-   if (navigator.onLine) {
-    SyncManager.performDeltaSync();
-} 
-    updateProductsUI();
-    updateShortagesUI();
-    alert("✅ تم تصفير جميع الكميات");
-    addAdminLog("تصفير المخزون", "تم تصفير كميات جميع القطع في المحل");
+    return zeroProductStockMaintenance();
 }
 
 function deleteAllProducts() {
-    if (!confirm("⚠️ تحذير خطير جداً: سيتم مسح جميع المنتجات من المخزن نهائياً! هل أنت متأكد؟")) return;
-    if (!confirm("تأكيد أخير: لا يمكن التراجع عن هذا الإجراء وسيتم حذفه من أجهزة الشركاء أيضاً! هل تريد الاستمرار؟")) return;
-
-    state.products.forEach(p => {
-        if(p && p.id) {
-            
-            trackChange('products', p.id, 'delete', { id: p.id });
-        }
-    });
-
-    state.products = [];
-    saveToLocal();
-    if (navigator.onLine) {
-    SyncManager.performDeltaSync();
+    return deleteAllProductsMaintenance();
 }
-    updateProductsUI();
-    updateShortagesUI();
-    calculateDashboard();
-    addAdminLog("حذف المخزن", "تم مسح جميع المنتجات من المخزن بالكامل");
-    alert("✅ تم حذف جميع المنتجات والصور من المخزن نهائياً!");
+
+function renderProductsMaintenanceReport(title, payload) {
+    const target = document.getElementById('products-maintenance-report');
+    const text = `${title}\n${JSON.stringify(payload, null, 2)}`;
+    if (target) {
+        target.textContent = text;
+        target.style.display = 'block';
+    } else {
+        console.log(text);
+    }
+}
+
+function productObjectFromList(products) {
+    return arrayToObjectById(dedupeProductsSafe(products, { source: 'productObjectFromList', log: false }).products);
+}
+
+function removeLocalProductSyncArtifacts() {
+    if (window.SyncQueue && Array.isArray(SyncQueue.items)) {
+        SyncQueue.items = SyncQueue.items.filter(change => change && change.collection !== 'products');
+        try { SyncQueue.save(); } catch (error) { console.warn('Failed to save pruned product queue:', error); }
+    }
+    try { localStorage.removeItem('largeExcelImportPendingChangesV1'); } catch (_) {}
+}
+
+async function clearPendingProductImages() {
+    try {
+        await localforage.setItem(SYNC_PENDING_IMAGES_KEY, []);
+    } catch (error) {
+        console.warn('Failed to clear pending product images:', error);
+    }
+}
+
+async function productSyncChangesCleanupUpdates(now) {
+    const updates = {};
+    const snapshot = await db.ref('sync/changes').once('value');
+    const changes = snapshot.val() || {};
+    Object.keys(changes).forEach(id => {
+        const change = changes[id];
+        if (change && change.collection === 'products') updates[`sync/changes/${id}`] = null;
+    });
+    updates['maintenance/productsResetGeneration'] = now;
+    updates['sync/lastSyncTime'] = now;
+    return updates;
+}
+
+async function createFirebaseProductsBackup(reason) {
+    const access = await ensureFirebaseAccess();
+    if (!access.ok) throw new Error(access.error);
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const path = `backups/${reason}-${stamp}`;
+    const [productsSnap, fullBackupProductsSnap, changesSnap, maintenanceSnap] = await Promise.all([
+        db.ref('products').once('value'),
+        db.ref('full_backup/products').once('value'),
+        db.ref('sync/changes').once('value'),
+        db.ref('maintenance').once('value')
+    ]);
+    const productChanges = {};
+    const changes = changesSnap.val() || {};
+    Object.keys(changes).forEach(id => {
+        const change = changes[id];
+        if (change && change.collection === 'products') productChanges[id] = change;
+    });
+    await db.ref(path).set({
+        reason,
+        createdAt: Date.now(),
+        deviceId: DEVICE_ID,
+        products: productsSnap.val() || null,
+        fullBackupProducts: fullBackupProductsSnap.val() || null,
+        productSyncChanges: productChanges,
+        maintenance: maintenanceSnap.val() || null
+    });
+    return path;
+}
+
+async function previewDuplicateProductsMaintenance() {
+    const reports = {
+        local: dedupeProductsSafe(state.products, { source: 'maintenance-preview-local', log: false })
+    };
+    try {
+        if (navigator.onLine) {
+            const access = await ensureFirebaseAccess();
+            if (access.ok) {
+                const [productsSnap, fullBackupProductsSnap] = await Promise.all([
+                    db.ref('products').once('value'),
+                    db.ref('full_backup/products').once('value')
+                ]);
+                reports.firebaseProducts = dedupeProductsSafe(productsSnap.val() || [], { source: 'maintenance-preview-firebase', log: false });
+                reports.fullBackupProducts = dedupeProductsSafe(fullBackupProductsSnap.val() || [], { source: 'maintenance-preview-full-backup', log: false });
+            } else {
+                reports.firebase = { skipped: true, error: access.error };
+            }
+        } else {
+            reports.firebase = { skipped: true, error: 'offline' };
+        }
+    } catch (error) {
+        reports.firebase = { skipped: true, error: error && error.message ? error.message : String(error) };
+    }
+    renderProductsMaintenanceReport('Product duplicate preview', reports);
+    return reports;
+}
+
+async function confirmDedupeProductsMaintenance() {
+    const typed = prompt('Type DEDUPE PRODUCTS to clean duplicated products after creating a Firebase backup.');
+    if (typed !== 'DEDUPE PRODUCTS') return alert('Cancelled.');
+    if (!navigator.onLine) return alert('Internet connection is required for Firebase product cleanup.');
+
+    showSpinner(true);
+    try {
+        const access = await ensureFirebaseAccess();
+        if (!access.ok) throw new Error(access.error);
+        const backupPath = await createFirebaseProductsBackup('before-products-dedupe');
+        const [productsSnap, fullBackupProductsSnap] = await Promise.all([
+            db.ref('products').once('value'),
+            db.ref('full_backup/products').once('value')
+        ]);
+        const productReport = dedupeProductsSafe(productsSnap.val() || [], { source: 'maintenance-confirm-products' });
+        const fullBackupExists = fullBackupProductsSnap.exists();
+        const fullBackupReport = dedupeProductsSafe(fullBackupProductsSnap.val() || [], { source: 'maintenance-confirm-full-backup' });
+        const now = Date.now();
+        const updates = await productSyncChangesCleanupUpdates(now);
+        updates.products = productObjectFromList(productReport.products);
+        if (fullBackupExists) updates['full_backup/products'] = productObjectFromList(fullBackupReport.products);
+        updates['maintenance/productsDedupeAt'] = now;
+        updates['maintenance/productsDedupeVersion'] = PRODUCT_MAINTENANCE_VERSION;
+        updates['maintenance/productsDedupeBackupPath'] = backupPath;
+
+        await db.ref().update(updates);
+        state.products = productReport.products;
+        removeLocalProductSyncArtifacts();
+        await clearPendingProductImages();
+        await saveToLocal();
+        updateAllUI();
+        addAdminLog('Product dedupe', `Cleaned products after backup ${backupPath}`);
+        renderProductsMaintenanceReport('Product duplicate cleanup complete', { backupPath, productReport, fullBackupReport });
+        alert('Product duplicate cleanup completed. A Firebase backup was created first.');
+    } catch (error) {
+        console.error(error);
+        alert('Product duplicate cleanup failed: ' + explainFirebasePermissionError(error));
+    } finally {
+        showSpinner(false);
+    }
+}
+
+async function deleteAllProductsMaintenance() {
+    const mode = prompt('Type LOCAL to delete products only on this device, or FIREBASE to delete products for all devices.');
+    if (mode !== 'LOCAL' && mode !== 'FIREBASE') return alert('Cancelled.');
+
+    if (mode === 'LOCAL') {
+        const typed = prompt('Type DELETE LOCAL PRODUCTS to confirm local-only product deletion.');
+        if (typed !== 'DELETE LOCAL PRODUCTS') return alert('Cancelled.');
+        state.products = [];
+        removeLocalProductSyncArtifacts();
+        await clearPendingProductImages();
+        await saveToLocal();
+        updateAllUI();
+        addAdminLog('Local product delete', 'Deleted products from this device only. Firebase was not deleted.');
+        alert('Products were deleted from this device only. Firebase was not deleted.');
+        return;
+    }
+
+    const typed = prompt('Type DELETE FIREBASE PRODUCTS to delete products for all devices after backup.');
+    if (typed !== 'DELETE FIREBASE PRODUCTS') return alert('Cancelled.');
+    if (!navigator.onLine) return alert('Internet connection is required for Firebase product deletion.');
+
+    showSpinner(true);
+    try {
+        const access = await ensureFirebaseAccess();
+        if (!access.ok) throw new Error(access.error);
+        const backupPath = await createFirebaseProductsBackup('before-delete-all-products');
+        const now = Date.now();
+        const updates = await productSyncChangesCleanupUpdates(now);
+        updates.products = null;
+        updates['full_backup/products'] = null;
+        updates['sync/collectionClears/products'] = { collection: 'products', reason: 'deleteAllProductsMaintenance', clearedAt: now, syncVersion: Number(state.syncVersion) || 0, deviceId: DEVICE_ID };
+        updates['maintenance/productsDeletedAt'] = now;
+        updates['maintenance/productsDeletedBackupPath'] = backupPath;
+        updates['maintenance/productsDedupeVersion'] = PRODUCT_MAINTENANCE_VERSION;
+
+        await db.ref().update(updates);
+        state.products = [];
+        removeLocalProductSyncArtifacts();
+        await clearPendingProductImages();
+        await saveToLocal();
+        updateAllUI();
+        addAdminLog('Firebase product delete', `Deleted all products after backup ${backupPath}`);
+        renderProductsMaintenanceReport('All products deleted', { mode, backupPath, deletedProducts: true });
+        alert('All products were deleted after a Firebase backup. Other ERP data was not deleted.');
+    } catch (error) {
+        console.error(error);
+        alert('Product deletion failed: ' + explainFirebasePermissionError(error));
+    } finally {
+        showSpinner(false);
+    }
+}
+
+async function zeroProductStockMaintenance() {
+    const mode = prompt('Type LOCAL to zero stock only on this device, or FIREBASE to zero stock for all devices.');
+    if (mode !== 'LOCAL' && mode !== 'FIREBASE') return alert('Cancelled.');
+    const typed = prompt('Type ZERO PRODUCT STOCK to confirm. Products will remain; only stock becomes 0.');
+    if (typed !== 'ZERO PRODUCT STOCK') return alert('Cancelled.');
+
+    const now = Date.now();
+    const zeroedProducts = dedupeProductsSafe(state.products, { source: 'zero-stock-local-base', log: false }).products.map(product => ({
+        ...product,
+        stock: 0,
+        version: (Number(product.version) || 0) + 1,
+        _updatedAt: now,
+        _deviceId: DEVICE_ID
+    }));
+
+    if (mode === 'LOCAL') {
+        state.products = zeroedProducts;
+        removeLocalProductSyncArtifacts();
+        await saveToLocal();
+        updateAllUI();
+        addAdminLog('Local stock zero', 'Zeroed product stock on this device only. Firebase was not changed.');
+        alert('Product stock was zeroed on this device only. Firebase was not changed.');
+        return;
+    }
+
+    if (!navigator.onLine) return alert('Internet connection is required for Firebase stock zeroing.');
+
+    showSpinner(true);
+    try {
+        const access = await ensureFirebaseAccess();
+        if (!access.ok) throw new Error(access.error);
+        const backupPath = await createFirebaseProductsBackup('before-zero-product-stock');
+        const [productsSnap, fullBackupProductsSnap] = await Promise.all([
+            db.ref('products').once('value'),
+            db.ref('full_backup/products').once('value')
+        ]);
+        const cloudProducts = dedupeProductsSafe(productsSnap.val() || [], { source: 'zero-stock-firebase-base', log: false }).products.map(product => ({
+            ...product,
+            stock: 0,
+            version: (Number(product.version) || 0) + 1,
+            _updatedAt: now,
+            _deviceId: DEVICE_ID
+        }));
+        const fullBackupExists = fullBackupProductsSnap.exists();
+        const fullBackupProducts = dedupeProductsSafe(fullBackupProductsSnap.val() || [], { source: 'zero-stock-full-backup-base', log: false }).products.map(product => ({
+            ...product,
+            stock: 0,
+            version: (Number(product.version) || 0) + 1,
+            _updatedAt: now,
+            _deviceId: DEVICE_ID
+        }));
+        const updates = await productSyncChangesCleanupUpdates(now);
+        updates.products = productObjectFromList(cloudProducts);
+        if (fullBackupExists) updates['full_backup/products'] = productObjectFromList(fullBackupProducts);
+        updates['maintenance/productsStockZeroedAt'] = now;
+        updates['maintenance/productsStockZeroBackupPath'] = backupPath;
+        updates['maintenance/productsDedupeVersion'] = PRODUCT_MAINTENANCE_VERSION;
+
+        await db.ref().update(updates);
+        state.products = cloudProducts;
+        removeLocalProductSyncArtifacts();
+        await saveToLocal();
+        updateAllUI();
+        addAdminLog('Firebase stock zero', `Zeroed product stock after backup ${backupPath}`);
+        renderProductsMaintenanceReport('Product stock zeroed', { mode, backupPath, totalProducts: cloudProducts.length });
+        alert('Product stock was zeroed for all devices after a Firebase backup.');
+    } catch (error) {
+        console.error(error);
+        alert('Stock zeroing failed: ' + explainFirebasePermissionError(error));
+    } finally {
+        showSpinner(false);
+    }
+}
+
+async function clearCurrentDeviceData() {
+    const typed = prompt('Type CLEAR THIS DEVICE to remove local data, queues, pending images, and PWA caches from this device only.');
+    if (typed !== 'CLEAR THIS DEVICE') return alert('Cancelled.');
+    const second = confirm('Firebase will NOT be deleted. Continue clearing this device only?');
+    if (!second) return;
+
+    showSpinner(true);
+    try {
+        await createEmergencyBackupFile('before_clear_current_device');
+        try { await localforage.clear(); } catch (error) { console.warn('localforage clear failed:', error); }
+        const keyPattern = /(abonibal|abn|alfares|wakalat|sync|collection|firebase|localforage|products|erp)/i;
+        try {
+            Object.keys(localStorage).forEach(key => { if (keyPattern.test(key)) localStorage.removeItem(key); });
+        } catch (error) { console.warn('localStorage cleanup failed:', error); }
+        try {
+            Object.keys(sessionStorage).forEach(key => { if (keyPattern.test(key)) sessionStorage.removeItem(key); });
+        } catch (error) { console.warn('sessionStorage cleanup failed:', error); }
+        try {
+            if (window.caches && caches.keys) {
+                const names = await caches.keys();
+                await Promise.all(names.filter(name => keyPattern.test(name)).map(name => caches.delete(name)));
+            }
+        } catch (error) { console.warn('cache cleanup failed:', error); }
+        try {
+            SyncQueue.items = [];
+            SyncQueue.processed.clear();
+        } catch (_) {}
+        Object.assign(state, buildEmptyStateObject());
+        alert('This device was cleared only. Firebase was not deleted. The page will reload.');
+        location.reload();
+    } catch (error) {
+        console.error(error);
+        alert('Current device cleanup failed: ' + (error && error.message ? error.message : String(error)));
+    } finally {
+        showSpinner(false);
+    }
 }
 
 // ============================================================
@@ -3538,13 +4154,6 @@ function updateAllUI() {
 async function initApp() {
     showSpinner(true);
     await loadFromLocal();
-
-    state.products.forEach(p => {
-        if (p && !p.id) {
-            p.id = generateUniqueID();
-            console.log('✅ تم إضافة ID للمنتج (initApp):', p.name);
-        }
-    });
 
     try {
         state.clients.forEach(c => { if (c && !c.id) c.id = generateUniqueID(); });
@@ -3764,7 +4373,7 @@ async function pullFromCloud() {
         const data = snapshot.val();
         if (!data) return alert('⚠️ السحابة فارغة.');
 
-        if (data.products) state.products = mergeById(state.products, cleanProductsData(data.products));
+        replaceProductsFromSource(data.products !== undefined ? data.products : (data.full_backup && data.full_backup.products) || [], 'pullFromCloud');
         if (data.categories) state.categories = forceArray(data.categories);
         if (data.clients) state.clients = mergeById(state.clients, forceArray(data.clients));
         if (data.suppliers) state.suppliers = mergeById(state.suppliers, forceArray(data.suppliers));
@@ -3865,7 +4474,7 @@ async function wipeApplication() {
         await saveToLocal();
         updateAllUI();
         if (window.ABNAuth && typeof window.ABNAuth.logout === 'function') await window.ABNAuth.logout();
-        alert('✅ تم تبييض التطبيق بالكامل. كلمة المرور عادت إلى كلمة المرور الافتراضية.');
+        alert('✅ تم مسح بيانات التطبيق. تتم المصادقة فقط عبر Firebase Auth.');
     } catch (error) {
         console.error(error);
         alert('❌ فشل تبييض التطبيق: ' + explainFirebasePermissionError(error));
@@ -3959,6 +4568,7 @@ function normalizeImportedState(imported) {
     const clean = buildEmptyStateObject();
     if (!imported || typeof imported !== 'object') throw new Error('INVALID_BACKUP');
     PATCH002_ARRAY_COLLECTIONS.forEach(collection => { clean[collection] = forceArray(imported[collection]); });
+    clean.products = dedupeProductsSafe(clean.products, { source: 'importBackup', log: false }).products;
     clean.categories = forceArray(imported.categories).length ? forceArray(imported.categories) : clean.categories;
     clean.rates = { try: Number(imported.rates && imported.rates.try) || 0, syp: Number(imported.rates && imported.rates.syp) || 0 };
     clean.safes = { usd: Number(imported.safes && imported.safes.usd) || 0, try: Number(imported.safes && imported.safes.try) || 0, syp: Number(imported.safes && imported.safes.syp) || 0 };
