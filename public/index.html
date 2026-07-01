@@ -81,7 +81,7 @@
     <div class="nav-item" onclick="switchTab('categories', this)"><span class="icon">🗂️</span><span>الأقسام</span></div>
     <div class="nav-item" onclick="switchTab('logs', this)"><span class="icon">📋</span><span>السجل</span></div>
     <div class="nav-item" onclick="switchTab('ledger', this)"><span class="icon">📚</span><span>دفتر الأستاذ</span></div>
-    <div class="nav-item" onclick="switchTab('security', this)"><span class="icon">🔐</span><span>الأمان</span></div>
+    <div class="nav-item" onclick="switchTab('maintenance', this)"><span class="icon">🧰</span><span>الصيانة</span></div>
     <div class="nav-item" onclick="switchTab('system', this)"><span class="icon">🏷️</span><span>النظام والترخيص</span></div>
 </nav> 
 
@@ -552,20 +552,20 @@
         </div>
     </div>
 
-    <!-- Security Tab -->
-    <div id="tab-security" class="tab-content">
+    <!-- Maintenance Tab -->
+    <div id="tab-maintenance" class="tab-content">
         <div class="card">
-            <div class="card-title">🔐 إعدادات الأمان</div>
-            <p style="font-size:13px; color:#64748b; margin-bottom:12px; line-height:1.8; font-weight:700;">&#x062A;&#x062A;&#x0645; &#x062D;&#x0645;&#x0627;&#x064A;&#x0629; &#x0627;&#x0644;&#x0646;&#x0638;&#x0627;&#x0645; &#x0639;&#x0628;&#x0631; &#x062D;&#x0633;&#x0627;&#x0628; Firebase &#x0627;&#x0644;&#x0645;&#x0635;&#x0631;&#x062D; &#x0641;&#x0642;&#x0637;. &#x0644;&#x062A;&#x063A;&#x064A;&#x064A;&#x0631; &#x0643;&#x0644;&#x0645;&#x0629; &#x0627;&#x0644;&#x0645;&#x0631;&#x0648;&#x0631;&#x060C; &#x0627;&#x0633;&#x062A;&#x062E;&#x062F;&#x0645; &#x0625;&#x0639;&#x062F;&#x0627;&#x062F;&#x0627;&#x062A; Firebase Auth.</p>
-            <button onclick="ABNAuth.logout(event)" style="background:#64748b; margin-top:10px;">🚪 تسجيل خروج</button>
-        </div>
-
-        <div class="card" style="background:#fef2f2; border:1px solid #fecaca;">
-            <div class="card-title" style="color:#991b1b;">🧹 تبييض التطبيق</div>
-            <p style="font-size:13px; color:#7f1d1d; margin-bottom:12px; line-height:1.8; font-weight:700;">
-                هذا الإجراء يمسح كل بيانات التطبيق محلياً ومن السحابة: المنتجات، الفواتير، العملاء، الموردين، الصندوق، السجلات، القيود، طوابير المزامنة، والصور المعلقة. لا يمكن التراجع عنه إلا بوجود نسخة احتياطية.
-            </p>
-            <button onclick="wipeApplication()" style="background:#b91c1c;">🧨 تبييض التطبيق بالكامل</button>
+            <div class="card-title">🧰 صيانة المنتجات والمزامنة</div>
+            <p style="font-size:13px; color:#64748b; margin-bottom:12px; line-height:1.8; font-weight:700;">كل إجراء هنا محدود بالمنتجات أو بهذا الجهاز فقط. لا يتم حذف الفواتير أو العملاء أو الموردين أو المصاريف أو المبيعات أو القيود المحاسبية.</p>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap:10px;">
+                <button onclick="previewDuplicateProductsMaintenance()" style="background:#2563eb;">معاينة تكرار المنتجات</button>
+                <button onclick="confirmDedupeProductsMaintenance()" style="background:#0f766e;">تنظيف تكرار المنتجات</button>
+                <button onclick="zeroProductStockMaintenance()" style="background:#ca8a04;">تصفير كميات المنتجات</button>
+                <button onclick="deleteAllProductsMaintenance()" style="background:#b91c1c;">حذف كل المنتجات</button>
+                <button onclick="clearCurrentDeviceData()" style="background:#64748b;">مسح بيانات هذا الجهاز فقط</button>
+                <button onclick="ABNAuth.logout(event)" style="background:#475569;">تسجيل خروج</button>
+            </div>
+            <pre id="products-maintenance-report" style="display:none; margin-top:12px; padding:12px; direction:ltr; text-align:left; white-space:pre-wrap; background:#0f172a; color:#e2e8f0; border-radius:8px; max-height:360px; overflow:auto;"></pre>
         </div>
     </div>
 
@@ -630,7 +630,7 @@
                         <li>المزامنة و Firebase</li>
                         <li>الحسابات والصناديق والعملات</li>
                         <li>الفواتير والمنطق المالي</li>
-                        <li>كلمة المرور والتبييض والاسترجاع</li>
+                        <li>Firebase Auth والصيانة الآمنة والاسترجاع</li>
                     </ul>
                 </div>
                 <div class="abn-governance-card">
