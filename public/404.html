@@ -565,6 +565,14 @@
                 <button onclick="clearCurrentDeviceData()" style="background:#64748b;">مسح بيانات هذا الجهاز فقط</button>
                 <button onclick="ABNAuth.logout(event)" style="background:#475569;">تسجيل خروج</button>
             </div>
+            <div style="margin-top:14px; padding:12px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc;">
+                <div style="font-weight:800; margin-bottom:8px;">استبدال المنتجات من ملف Excel</div>
+                <div style="display:grid; grid-template-columns: minmax(220px, 1fr) repeat(2, minmax(180px, auto)); gap:10px; align-items:center;">
+                    <input type="file" id="master-products-excel-file" accept=".xlsx,.xls" onchange="resetMasterProductsReplacePreview()" style="margin:0;">
+                    <button type="button" onclick="previewReplaceProductsFromMasterExcel()" style="background:#2563eb;">معاينة الاستبدال</button>
+                    <button type="button" id="confirm-master-products-replace-btn" onclick="confirmReplaceProductsFromMasterExcel()" disabled style="background:#b91c1c;">تنفيذ الاستبدال النهائي</button>
+                </div>
+            </div>
             <div id="products-maintenance-report" style="display:none; margin-top:12px; padding:12px; direction:ltr; text-align:left; background:#f8fafc; color:#0f172a; border:1px solid #cbd5e1; border-radius:8px; max-height:420px; overflow:auto;"></div>
         </div>
     </div>

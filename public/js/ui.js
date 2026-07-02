@@ -795,7 +795,9 @@
 
         manager.collectPendingChanges = function collectPendingChangesStabilizedP3() {
             installQueueGovernance();
-            const pending = queue.getPending().map(normalizeChange).filter(Boolean);
+            const pending = queue.getPending().map(normalizeChange).filter(function(change){
+                return change && !(typeof isStaleProductSyncChange === 'function' && isStaleProductSyncChange(change));
+            });
             return pending.slice(0, QUEUE_SYNC_MAX_PER_RUN);
         };
 
@@ -832,7 +834,21 @@
         }
 
         manager.uploadLocalChanges = async function uploadLocalChangesStabilizedP3(pending) {
-            const selected = normalizeChangeArray(pending || manager.collectPendingChanges()).slice(0, QUEUE_SYNC_MAX_PER_RUN);
+            if (typeof refreshProductsReplacementMarkerFromFirebase === 'function') {
+                await refreshProductsReplacementMarkerFromFirebase();
+            }
+            const staleIds = [];
+            const selected = normalizeChangeArray(pending || manager.collectPendingChanges())
+                .filter(function(change){
+                    const stale = typeof isStaleProductSyncChange === 'function' && isStaleProductSyncChange(change);
+                    if (stale && change && change.id) staleIds.push(change.id);
+                    return !stale;
+                })
+                .slice(0, QUEUE_SYNC_MAX_PER_RUN);
+            if (staleIds.length && queue && typeof queue.markSyncedByIds === 'function') {
+                queue.markSyncedByIds(staleIds);
+                if (typeof queue.removeSynced === 'function') queue.removeSynced();
+            }
             if (!selected.length) return 0;
             if (!navigator.onLine) return 0;
             if (typeof ensureFirebaseAccess === 'function') {

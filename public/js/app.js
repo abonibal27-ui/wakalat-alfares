@@ -156,6 +156,10 @@ function mergeById(localArr, cloudArr) {
 const PRODUCT_IDENTITY_FIELDS = ['code', 'barcode', 'partNumber', 'part_number', 'sku'];
 const PRODUCT_NUMERIC_FIELDS = ['cost', 'wholesale', 'retail', 'stock'];
 const PRODUCT_MAINTENANCE_VERSION = 'PRODUCTS_DEDUPE_V1';
+const MASTER_PRODUCTS_EXPECTED_COUNT = 1303;
+const MASTER_PRODUCTS_EXPECTED_SOURCE = 'ملف المنتجات.xlsx';
+const MASTER_PRODUCTS_SHEET_NAME = 'المخزون';
+const MASTER_PRODUCTS_CONFIRM_PHRASE = 'استبدال المنتجات من الملف';
 
 function normalizeProductText(value) {
     const digitMap = {
@@ -197,6 +201,42 @@ function normalizeLegacyNumber(value, integer = false) {
     if (!Number.isFinite(n)) return 0;
     const normalized = integer ? Math.trunc(n) : roundMoney(n);
     return normalized < 0 ? 0 : normalized;
+}
+
+function normalizeMasterNumberText(value) {
+    const digitMap = {
+        '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4', '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9',
+        '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4', '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9'
+    };
+    let text = String(value ?? '')
+        .normalize('NFKC')
+        .replace(/[٠-٩۰-۹]/g, ch => digitMap[ch] || ch)
+        .replace(/\s+/g, '')
+        .replace(/[^\d.,+-]/g, '');
+    if (text.includes(',') && text.includes('.')) {
+        text = text.replace(/,/g, '');
+    } else if (text.includes(',') && !text.includes('.')) {
+        text = text.replace(',', '.');
+    }
+    return text;
+}
+
+function parseMasterNumberCell(value, options = {}) {
+    const raw = String(value ?? '').trim();
+    if (!raw) return { ok: false, empty: true, value: null };
+    const normalized = normalizeMasterNumberText(value);
+    if (!normalized || normalized === '+' || normalized === '-' || normalized === '.' || normalized === ',') {
+        return { ok: false, empty: false, value: null };
+    }
+    const n = Number(normalized);
+    if (!Number.isFinite(n) || n < 0) return { ok: false, empty: false, value: null };
+    return { ok: true, empty: false, value: options.integer ? Math.trunc(n) : roundMoney(n) };
+}
+
+function createMasterProductId(name, category) {
+    const normalizedName = normalizeProductText(name);
+    const normalizedCategory = normalizeProductText(category);
+    return `master-product-${stableHash(`${normalizedName}::${normalizedCategory}`)}`;
 }
 
 function getProductIdentityKeys(product) {
@@ -594,6 +634,7 @@ function explainFirebasePermissionError(error) {
 const SYNC_DEVICE_ID_KEY = 'abonibalProductionDeviceId';
 const SYNC_QUEUE_KEY = 'abonibalProductionSyncQueueV2';
 const SYNC_PENDING_IMAGES_KEY = 'abonibalProductionPendingImageUploads';
+const PRODUCTS_REPLACEMENT_MARKER_KEY = 'abonibalProductsReplacementMarkerV1';
 const DEVICE_ID = (() => {
     let id = localStorage.getItem(SYNC_DEVICE_ID_KEY);
     if (!id) {
@@ -605,6 +646,85 @@ const DEVICE_ID = (() => {
 
 function safeJsonParse(value, fallback) {
     try { return JSON.parse(value || ''); } catch (_) { return fallback; }
+}
+
+let productsReplacementMarkerLastRefresh = 0;
+
+function readProductsReplacementMarker() {
+    return safeJsonParse(localStorage.getItem(PRODUCTS_REPLACEMENT_MARKER_KEY), {});
+}
+
+function writeProductsReplacementMarker(marker) {
+    const current = readProductsReplacementMarker();
+    const next = {
+        productsReplacedAt: Math.max(Number(current.productsReplacedAt) || 0, Number(marker && marker.productsReplacedAt) || 0),
+        productsResetGeneration: Math.max(Number(current.productsResetGeneration) || 0, Number(marker && marker.productsResetGeneration) || 0),
+        productsMasterImportCount: Number(marker && marker.productsMasterImportCount) || Number(current.productsMasterImportCount) || 0,
+        productsMasterImportSource: marker && marker.productsMasterImportSource || current.productsMasterImportSource || ''
+    };
+    localStorage.setItem(PRODUCTS_REPLACEMENT_MARKER_KEY, JSON.stringify(next));
+    return next;
+}
+
+function productReplacementCutoff() {
+    const marker = readProductsReplacementMarker();
+    return Math.max(Number(marker.productsReplacedAt) || 0, Number(marker.productsResetGeneration) || 0);
+}
+
+function syncChangeTimestamp(change) {
+    return Math.max(
+        Number(change && change.timestamp) || 0,
+        Number(change && change.localSeq) || 0,
+        Number(change && change.data && change.data._updatedAt) || 0
+    );
+}
+
+function isStaleProductSyncChange(change) {
+    if (!change || change.collection !== 'products') return false;
+    const cutoff = productReplacementCutoff();
+    if (!cutoff) return false;
+    const changeTime = syncChangeTimestamp(change);
+    return Boolean(changeTime && changeTime <= cutoff);
+}
+
+function activeProductSyncChanges(changes) {
+    return forceArray(changes).filter(change => !isStaleProductSyncChange(change));
+}
+
+function pruneStaleProductSyncQueue() {
+    if (typeof SyncQueue === 'undefined' || !Array.isArray(SyncQueue.items)) return 0;
+    const before = SyncQueue.items.length;
+    SyncQueue.items = SyncQueue.items.filter(change => !isStaleProductSyncChange(change));
+    if (SyncQueue.items.length !== before) {
+        try { SyncQueue.save(); } catch (error) { console.warn('Failed to save pruned stale product queue:', error); }
+    }
+    return before - SyncQueue.items.length;
+}
+
+async function refreshProductsReplacementMarkerFromFirebase(force = false) {
+    const now = Date.now();
+    if (!force && productsReplacementMarkerLastRefresh && now - productsReplacementMarkerLastRefresh < 30000) {
+        return readProductsReplacementMarker();
+    }
+    productsReplacementMarkerLastRefresh = now;
+    try {
+        if (!navigator.onLine || typeof db === 'undefined' || !db || !db.ref) return readProductsReplacementMarker();
+        const access = await ensureFirebaseAccess();
+        if (!access.ok) return readProductsReplacementMarker();
+        const snapshot = await db.ref('maintenance').once('value');
+        const maintenance = snapshot.val() || {};
+        const marker = writeProductsReplacementMarker({
+            productsReplacedAt: maintenance.productsReplacedAt,
+            productsResetGeneration: maintenance.productsResetGeneration,
+            productsMasterImportCount: maintenance.productsMasterImportCount,
+            productsMasterImportSource: maintenance.productsMasterImportSource
+        });
+        pruneStaleProductSyncQueue();
+        return marker;
+    } catch (error) {
+        console.warn('Failed to refresh products replacement marker:', error);
+        return readProductsReplacementMarker();
+    }
 }
 
 const SyncQueue = {
@@ -825,7 +945,8 @@ async function queueImageUpload(entityId, dataURL) {
 const SyncManager = {};
 
 SyncManager.collectPendingChanges = function () {
-    return SyncQueue.getPending();
+    pruneStaleProductSyncQueue();
+    return activeProductSyncChanges(SyncQueue.getPending());
 };
 
 SyncManager.downloadRemoteChanges = async function (currentVersion) {
@@ -861,7 +982,7 @@ SyncManager.allocateVersions = async function (pending) {
 
 SyncManager.buildUpdates = function (changes) {
     const updates = {};
-    changes.forEach(change => {
+    activeProductSyncChanges(changes).forEach(change => {
         updates[`sync/changes/${change.id}`] = change;
         const path = rootPathForChange(change);
         if (path) {
@@ -882,6 +1003,9 @@ SyncManager.buildUpdates = function (changes) {
 };
 
 SyncManager.uploadLocalChanges = async function (pending) {
+    await refreshProductsReplacementMarkerFromFirebase();
+    pruneStaleProductSyncQueue();
+    pending = activeProductSyncChanges(pending);
     if (!pending.length) return 0;
     const access = await ensureFirebaseAccess();
     if (!access.ok) throw new Error('تعذر تسجيل الدخول إلى Firebase: ' + access.error);
@@ -941,6 +1065,11 @@ SyncManager.processPendingImages = async function () {
 
 async function applyRemoteProductChange(change) {
     if (!change || change.collection !== 'products') return false;
+    await refreshProductsReplacementMarkerFromFirebase();
+    if (isStaleProductSyncChange(change)) {
+        if (change.syncVersion > (state.syncVersion || 0)) state.syncVersion = change.syncVersion;
+        return false;
+    }
 
     if (change.operation === 'delete') {
         state.products = state.products.filter(item => item && String(item.id) !== String(change.entityId));
@@ -1147,6 +1276,7 @@ async function pullFromCloud__legacyMerge() {
 
         if (data) {
             // ===== إصلاح جذري: الدمج بدلاً من الاستبدال =====
+            if (data.maintenance) writeProductsReplacementMarker(data.maintenance);
             replaceProductsFromSource(data.products !== undefined ? data.products : (data.full_backup && data.full_backup.products) || [], 'pullFromCloud-legacy');
             if (data.categories) state.categories = forceArray(data.categories);
             if (data.clients) state.clients = mergeById(state.clients, forceArray(data.clients));
@@ -1979,11 +2109,13 @@ function renderInvoiceTable() {
         if (!item) return;
         total += (item.qty * item.price);
         const prod = state.products.find(p => p && p.id === item.prodId);
+        const displayName = item.name || (prod && prod.name) || 'منتج قديم غير موجود في المخزون';
+        const maxStock = Number(item.maxStock || (prod && prod.stock) || item.qty || 1);
         html += `<tr>
             <td>${index + 1}</td>
             <td>${prod && prod.image ? `<img src="${escapeHtml(prod.image)}" style="width:40px; height:40px; object-fit:cover; border-radius:4px;">` : `<div class="no-image"></div>`}</td>
-            <td>${escapeHtml(item.name || '')}</td>
-            <td><input type="number" class="hide-on-print" value="${item.qty}" min="1" max="${item.maxStock}" onchange="updateInvItem(${index}, 'qty', this.value)" style="padding:2px;width:100%;text-align:center;font-size:11px;"><span class="print-show-span">${item.qty}</span></td>
+            <td>${escapeHtml(displayName)}</td>
+            <td><input type="number" class="hide-on-print" value="${item.qty}" min="1" max="${maxStock}" onchange="updateInvItem(${index}, 'qty', this.value)" style="padding:2px;width:100%;text-align:center;font-size:11px;"><span class="print-show-span">${item.qty}</span></td>
             <td><input type="number" class="hide-on-print" value="${item.price}" step="0.01" min="0" onchange="updateInvItem(${index}, 'price', this.value)" style="padding:2px;width:100%;text-align:center;font-size:11px;"><span class="print-show-span">${item.price}</span></td>
             <td class="hide-on-print"><button onclick="removeInvoiceItem(${index})" style="background:var(--danger-color); padding:2px 6px; font-size:11px; border:none; border-radius:3px; color:white; width:auto;">✕</button></td>
         </tr>`;
@@ -3927,6 +4059,8 @@ function renderProductsMaintenanceReport(title, payload) {
     const text = buildProductsMaintenanceReportText(title, summaries);
     window.__ABN_PRODUCTS_MAINTENANCE_REPORT_TEXT__ = text;
     if (target) {
+        target.style.direction = 'ltr';
+        target.style.textAlign = 'left';
         const rows = summaries.map(summary => {
             if (summary.skipped) {
                 return `<tr><td>${escapeHtml(summary.label)}</td><td colspan="8">${escapeHtml(summary.error)}</td></tr>`;
@@ -3991,16 +4125,545 @@ async function copyProductsMaintenanceReport() {
     }
 }
 
+let masterProductsReplacePreviewState = null;
+
+function masterProductsFileSignature(file) {
+    if (!file) return '';
+    return [file.name || '', file.size || 0, file.lastModified || 0].join('|');
+}
+
+function setMasterProductsConfirmEnabled(enabled) {
+    const btn = document.getElementById('confirm-master-products-replace-btn');
+    if (btn) btn.disabled = !enabled;
+}
+
+function resetMasterProductsReplacePreview() {
+    masterProductsReplacePreviewState = null;
+    setMasterProductsConfirmEnabled(false);
+}
+
+function readFileAsArrayBuffer(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error || new Error('فشل قراءة ملف Excel'));
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+function headerIndexMap(headers) {
+    const map = {};
+    headers.forEach((value, index) => {
+        const key = String(value ?? '').trim();
+        if (key && map[key] === undefined) map[key] = index;
+    });
+    return map;
+}
+
+function rowValue(row, map, key) {
+    const index = map[key];
+    return index === undefined ? '' : row[index];
+}
+
+function hasMappedRowData(row, map) {
+    return ['الاسم', 'القسم', 'سعر الشراء', 'سعر الجملة', 'سعر المفرق', 'الكمية']
+        .some(key => String(rowValue(row, map, key) ?? '').trim() !== '');
+}
+
+function duplicateMasterProductGroups(products) {
+    const groups = new Map();
+    products.forEach(product => {
+        const key = `${normalizeProductText(product.name)}::${normalizeProductText(product.category)}`;
+        if (!key || key === '::') return;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(product);
+    });
+    return Array.from(groups.entries())
+        .filter(([, items]) => items.length > 1)
+        .map(([key, items]) => ({
+            key,
+            count: items.length,
+            samples: items.slice(0, 5).map(item => ({ id: item.id, name: item.name, category: item.category }))
+        }));
+}
+
+async function parseMasterProductsExcel(file) {
+    if (typeof XLSX === 'undefined') throw new Error('مكتبة Excel غير محملة بعد.');
+    const data = new Uint8Array(await readFileAsArrayBuffer(file));
+    const workbook = XLSX.read(data, { type: 'array', cellDates: false });
+    const sheetName = workbook.SheetNames.find(name => name === MASTER_PRODUCTS_SHEET_NAME);
+    const report = {
+        fileName: file.name || '',
+        fileSignature: masterProductsFileSignature(file),
+        expectedCount: MASTER_PRODUCTS_EXPECTED_COUNT,
+        sheetName: sheetName || MASTER_PRODUCTS_SHEET_NAME,
+        sheetFound: Boolean(sheetName),
+        readCount: 0,
+        countMatchesExpected: false,
+        emptyNames: 0,
+        emptyCategories: 0,
+        invalidPrices: 0,
+        invalidQuantities: 0,
+        duplicateGroups: 0,
+        duplicateExamples: [],
+        errors: [],
+        sampleProducts: [],
+        importedProducts: [],
+        valid: false,
+        blockReasons: []
+    };
+
+    if (!sheetName) {
+        report.errors.push(`الشيت "${MASTER_PRODUCTS_SHEET_NAME}" غير موجود.`);
+        report.blockReasons.push('الشيت الأساسي غير موجود.');
+        return report;
+    }
+
+    const sheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false, blankrows: false });
+    const requiredHeaders = ['الاسم', 'القسم', 'سعر الشراء', 'سعر الجملة', 'سعر المفرق', 'الكمية'];
+    const headerRowIndex = rows.findIndex(row => {
+        const values = new Set((row || []).map(value => String(value ?? '').trim()).filter(Boolean));
+        return requiredHeaders.every(header => values.has(header));
+    });
+
+    if (headerRowIndex < 0) {
+        report.errors.push('لم يتم العثور على صف العناوين المطلوب: الاسم، القسم، سعر الشراء، سعر الجملة، سعر المفرق، الكمية.');
+        report.blockReasons.push('أعمدة Excel المطلوبة غير مكتملة.');
+        return report;
+    }
+
+    const map = headerIndexMap(rows[headerRowIndex] || []);
+    for (let index = headerRowIndex + 1; index < rows.length; index++) {
+        const row = rows[index] || [];
+        if (!hasMappedRowData(row, map)) continue;
+
+        report.readCount++;
+        const excelRowNumber = index + 1;
+        const rawName = String(rowValue(row, map, 'الاسم') ?? '').trim();
+        const rawCategory = String(rowValue(row, map, 'القسم') ?? '').trim();
+        const cost = parseMasterNumberCell(rowValue(row, map, 'سعر الشراء'));
+        const wholesale = parseMasterNumberCell(rowValue(row, map, 'سعر الجملة'));
+        const retail = parseMasterNumberCell(rowValue(row, map, 'سعر المفرق'));
+        const stock = parseMasterNumberCell(rowValue(row, map, 'الكمية'), { integer: true });
+        const rowErrors = [];
+
+        if (!rawName) {
+            report.emptyNames++;
+            rowErrors.push('الاسم فارغ');
+        }
+        if (!rawCategory) {
+            report.emptyCategories++;
+            rowErrors.push('القسم فارغ');
+        }
+        [
+            ['سعر الشراء', cost],
+            ['سعر الجملة', wholesale],
+            ['سعر المفرق', retail]
+        ].forEach(([label, parsed]) => {
+            if (!parsed.ok) {
+                report.invalidPrices++;
+                rowErrors.push(`${label} فارغ أو غير رقمي`);
+            }
+        });
+        if (!stock.ok) {
+            report.invalidQuantities++;
+            rowErrors.push('الكمية فارغة أو غير رقمية');
+        }
+
+        if (rowErrors.length) {
+            report.errors.push(`صف ${excelRowNumber}: ${rowErrors.join('، ')}`);
+            continue;
+        }
+
+        const product = {
+            id: createMasterProductId(rawName, rawCategory),
+            name: rawName,
+            category: rawCategory,
+            cost: cost.value,
+            wholesale: wholesale.value,
+            retail: retail.value,
+            stock: stock.value,
+            image: '',
+            version: 1,
+            masterImportSource: MASTER_PRODUCTS_EXPECTED_SOURCE
+        };
+        report.importedProducts.push(product);
+        if (report.sampleProducts.length < 10) report.sampleProducts.push(product);
+    }
+
+    const duplicateGroups = duplicateMasterProductGroups(report.importedProducts);
+    report.duplicateGroups = duplicateGroups.length;
+    report.duplicateExamples = duplicateGroups.slice(0, 20);
+    duplicateGroups.slice(0, 20).forEach(group => {
+        report.errors.push(`تكرار داخل Excel: ${group.key} (${group.count} منتجات)`);
+    });
+
+    report.countMatchesExpected = report.readCount === MASTER_PRODUCTS_EXPECTED_COUNT;
+    if (report.readCount !== MASTER_PRODUCTS_EXPECTED_COUNT) {
+        report.blockReasons.push(`عدد المنتجات المقروءة ${report.readCount} وليس ${MASTER_PRODUCTS_EXPECTED_COUNT}.`);
+    }
+    if (report.emptyNames) report.blockReasons.push(`يوجد ${report.emptyNames} أسماء فارغة.`);
+    if (report.invalidPrices) report.blockReasons.push(`يوجد ${report.invalidPrices} أسعار فارغة أو غير رقمية.`);
+    if (report.invalidQuantities) report.blockReasons.push(`يوجد ${report.invalidQuantities} كميات فارغة أو غير رقمية.`);
+    if (report.duplicateGroups) report.blockReasons.push(`يوجد ${report.duplicateGroups} مجموعات تكرار داخل Excel.`);
+    report.valid = report.blockReasons.length === 0;
+    return report;
+}
+
+function countProductsValue(value) {
+    return forceArray(value).length;
+}
+
+async function loadMasterProductsExistingCounts() {
+    const counts = {
+        stateProducts: { count: countProductsValue(state.products) },
+        firebaseProducts: { skipped: true, error: 'not checked' },
+        fullBackupProducts: { skipped: true, error: 'not checked' }
+    };
+    try {
+        if (!navigator.onLine) {
+            counts.firebaseProducts = { skipped: true, error: 'offline' };
+            counts.fullBackupProducts = { skipped: true, error: 'offline' };
+            return counts;
+        }
+        const access = await ensureFirebaseAccess();
+        if (!access.ok) {
+            counts.firebaseProducts = { skipped: true, error: access.error };
+            counts.fullBackupProducts = { skipped: true, error: access.error };
+            return counts;
+        }
+        const [productsSnap, fullBackupProductsSnap] = await Promise.all([
+            db.ref('products').once('value'),
+            db.ref('full_backup/products').once('value')
+        ]);
+        counts.firebaseProducts = { count: countProductsValue(productsSnap.val()) };
+        counts.fullBackupProducts = fullBackupProductsSnap.exists()
+            ? { count: countProductsValue(fullBackupProductsSnap.val()) }
+            : { count: 0, missing: true };
+    } catch (error) {
+        const message = error && error.message ? error.message : String(error);
+        counts.firebaseProducts = { skipped: true, error: message };
+        counts.fullBackupProducts = { skipped: true, error: message };
+    }
+    return counts;
+}
+
+function countLabel(item) {
+    if (!item) return 'غير متاح';
+    if (item.skipped) return `لم يتم الفحص: ${item.error || ''}`;
+    if (item.missing) return `${item.count} (full_backup.products غير موجود)`;
+    return String(Number(item.count) || 0);
+}
+
+function buildMasterProductsImportReportText(report) {
+    const lines = [
+        'استبدال المنتجات من ملف Excel - Preview',
+        `fileName: ${report.fileName}`,
+        `sheetName: ${report.sheetName}`,
+        `readCount: ${report.readCount}`,
+        `expectedCount: ${report.expectedCount}`,
+        `countMatchesExpected: ${report.countMatchesExpected ? 'yes' : 'no'}`,
+        `emptyNames: ${report.emptyNames}`,
+        `emptyCategories: ${report.emptyCategories}`,
+        `invalidPrices: ${report.invalidPrices}`,
+        `invalidQuantities: ${report.invalidQuantities}`,
+        `duplicateGroups: ${report.duplicateGroups}`,
+        `confirmAllowed: ${report.valid ? 'yes' : 'no'}`,
+        '',
+        `stateProducts: ${countLabel(report.counts && report.counts.stateProducts)}`,
+        `firebaseProducts: ${countLabel(report.counts && report.counts.firebaseProducts)}`,
+        `fullBackupProducts: ${countLabel(report.counts && report.counts.fullBackupProducts)}`,
+        ''
+    ];
+    if (report.blockReasons && report.blockReasons.length) {
+        lines.push('blockReasons:');
+        report.blockReasons.forEach(reason => lines.push(`- ${reason}`));
+        lines.push('');
+    }
+    if (report.errors && report.errors.length) {
+        lines.push('firstErrors:');
+        report.errors.slice(0, 20).forEach(error => lines.push(`- ${error}`));
+        lines.push('');
+    }
+    if (report.sampleProducts && report.sampleProducts.length) {
+        lines.push('sampleProducts:');
+        report.sampleProducts.slice(0, 10).forEach(product => {
+            lines.push(`- ${product.id} | ${product.name} | ${product.category} | cost=${product.cost} wholesale=${product.wholesale} retail=${product.retail} stock=${product.stock}`);
+        });
+    }
+    return lines.join('\n');
+}
+
+function renderMasterProductsImportReport(report, title = 'معاينة استبدال المنتجات من Excel') {
+    const target = document.getElementById('products-maintenance-report');
+    const text = buildMasterProductsImportReportText(report);
+    window.__ABN_PRODUCTS_MAINTENANCE_REPORT_TEXT__ = text;
+    if (!target) return console.log(text);
+
+    target.style.direction = 'rtl';
+    target.style.textAlign = 'right';
+    const summaryRows = [
+        ['اسم الملف', report.fileName],
+        ['اسم الشيت', report.sheetName],
+        ['عدد المنتجات المقروءة', report.readCount],
+        ['هل العدد = 1303', report.countMatchesExpected ? 'نعم' : 'لا'],
+        ['عدد الأسماء الفارغة', report.emptyNames],
+        ['عدد الأقسام الفارغة', report.emptyCategories],
+        ['عدد الأسعار الفارغة أو غير الرقمية', report.invalidPrices],
+        ['عدد الكميات الفارغة أو غير الرقمية', report.invalidQuantities],
+        ['عدد التكرارات داخل ملف Excel', report.duplicateGroups],
+        ['حالة تنفيذ الاستبدال', report.valid ? 'مسموح بعد التأكيد النهائي' : 'ممنوع حتى تصحيح الملف']
+    ].map(([label, value]) => `<tr><th style="padding:6px; text-align:right;">${escapeHtml(label)}</th><td style="padding:6px;">${escapeHtml(value)}</td></tr>`).join('');
+    const countRows = [
+        ['current/state products', report.counts && report.counts.stateProducts],
+        ['firebase products', report.counts && report.counts.firebaseProducts],
+        ['full_backup products', report.counts && report.counts.fullBackupProducts]
+    ].map(([label, item]) => `<tr><td style="padding:6px;">${escapeHtml(label)}</td><td style="padding:6px;">${escapeHtml(countLabel(item))}</td></tr>`).join('');
+    const errorRows = (report.errors || []).slice(0, 20)
+        .map((error, index) => `<tr><td style="padding:6px;">${index + 1}</td><td style="padding:6px;">${escapeHtml(error)}</td></tr>`)
+        .join('');
+    const sampleRows = (report.sampleProducts || []).slice(0, 10)
+        .map(product => `<tr><td style="padding:6px;">${escapeHtml(product.id)}</td><td style="padding:6px;">${escapeHtml(product.name)}</td><td style="padding:6px;">${escapeHtml(product.category)}</td><td style="padding:6px;">${product.cost}</td><td style="padding:6px;">${product.wholesale}</td><td style="padding:6px;">${product.retail}</td><td style="padding:6px;">${product.stock}</td></tr>`)
+        .join('');
+    const blockItems = (report.blockReasons || [])
+        .map(reason => `<li>${escapeHtml(reason)}</li>`)
+        .join('');
+
+    target.innerHTML = `
+        <div style="display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:10px;">
+            <strong>${escapeHtml(title)}</strong>
+            <button type="button" onclick="copyProductsMaintenanceReport()" style="width:auto; padding:8px 12px; background:#475569;">نسخ التقرير</button>
+        </div>
+        <table style="width:100%; border-collapse:collapse;" border="1"><tbody>${summaryRows}</tbody></table>
+        <div style="margin-top:12px; font-weight:800;">مصادر المنتجات الحالية</div>
+        <table style="width:100%; border-collapse:collapse;" border="1"><thead><tr><th>المصدر</th><th>العدد</th></tr></thead><tbody>${countRows}</tbody></table>
+        ${blockItems ? `<div style="margin-top:12px; color:#b91c1c; font-weight:800;">أسباب منع التنفيذ</div><ul>${blockItems}</ul>` : '<div style="margin-top:12px; color:#15803d; font-weight:800;">Preview ناجح. يمكن تنفيذ الاستبدال بعد التأكيد النهائي.</div>'}
+        <div style="margin-top:12px; font-weight:800;">أول 20 خطأ</div>
+        <table style="width:100%; border-collapse:collapse;" border="1"><thead><tr><th>#</th><th>الخطأ</th></tr></thead><tbody>${errorRows || '<tr><td colspan="2">لا توجد أخطاء.</td></tr>'}</tbody></table>
+        <div style="margin-top:12px; font-weight:800;">أول 10 منتجات كعينة</div>
+        <table style="width:100%; border-collapse:collapse;" border="1"><thead><tr><th>id</th><th>الاسم</th><th>القسم</th><th>شراء</th><th>جملة</th><th>مفرق</th><th>كمية</th></tr></thead><tbody>${sampleRows || '<tr><td colspan="7">لا توجد عينات.</td></tr>'}</tbody></table>`;
+    target.style.display = 'block';
+}
+
+async function previewReplaceProductsFromMasterExcel() {
+    const input = document.getElementById('master-products-excel-file');
+    const file = input && input.files && input.files[0];
+    if (!file) return alert('اختر ملف Excel أولًا.');
+
+    setMasterProductsConfirmEnabled(false);
+    showSpinner(true);
+    try {
+        const report = await parseMasterProductsExcel(file);
+        report.counts = await loadMasterProductsExistingCounts();
+        masterProductsReplacePreviewState = report;
+        renderMasterProductsImportReport(report);
+        setMasterProductsConfirmEnabled(report.valid);
+        if (!report.valid) {
+            alert('تمت المعاينة، لكن تنفيذ الاستبدال ممنوع حتى تصحيح الأسباب الظاهرة في التقرير.');
+        }
+        return report;
+    } catch (error) {
+        const report = {
+            fileName: file.name || '',
+            fileSignature: masterProductsFileSignature(file),
+            expectedCount: MASTER_PRODUCTS_EXPECTED_COUNT,
+            sheetName: MASTER_PRODUCTS_SHEET_NAME,
+            readCount: 0,
+            countMatchesExpected: false,
+            emptyNames: 0,
+            emptyCategories: 0,
+            invalidPrices: 0,
+            invalidQuantities: 0,
+            duplicateGroups: 0,
+            errors: [error && error.message ? error.message : String(error)],
+            sampleProducts: [],
+            blockReasons: ['تعذر قراءة ملف Excel.'],
+            counts: { stateProducts: { count: countProductsValue(state.products) } },
+            valid: false
+        };
+        masterProductsReplacePreviewState = report;
+        renderMasterProductsImportReport(report);
+        alert('فشلت معاينة ملف Excel: ' + report.errors[0]);
+        return report;
+    } finally {
+        showSpinner(false);
+    }
+}
+
+async function createFirebaseMasterProductsBackup(reason) {
+    const access = await ensureFirebaseAccess();
+    if (!access.ok) throw new Error(access.error);
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const path = `backups/${reason}-${stamp}`;
+    const snapshot = await db.ref().once('value');
+    const data = snapshot.val() || {};
+    const firebaseSnapshot = { ...data };
+    delete firebaseSnapshot.backups;
+    await db.ref(path).set({
+        reason,
+        type: 'full-before-products-replace',
+        createdAt: Date.now(),
+        deviceId: DEVICE_ID,
+        firebaseSnapshot
+    });
+    return path;
+}
+
+function renderMasterProductsReplaceSuccessReport(result) {
+    const report = {
+        fileName: result.fileName,
+        expectedCount: MASTER_PRODUCTS_EXPECTED_COUNT,
+        sheetName: MASTER_PRODUCTS_SHEET_NAME,
+        readCount: result.importedCount,
+        countMatchesExpected: result.importedCount === MASTER_PRODUCTS_EXPECTED_COUNT,
+        emptyNames: 0,
+        emptyCategories: 0,
+        invalidPrices: 0,
+        invalidQuantities: 0,
+        duplicateGroups: 0,
+        errors: [],
+        sampleProducts: result.sampleProducts || [],
+        blockReasons: [],
+        counts: {
+            stateProducts: { count: result.importedCount },
+            firebaseProducts: { count: result.importedCount },
+            fullBackupProducts: { count: result.importedCount }
+        },
+        valid: true
+    };
+    renderMasterProductsImportReport(report, 'تم استبدال المنتجات بنجاح');
+    window.__ABN_PRODUCTS_MAINTENANCE_REPORT_TEXT__ = [
+        'تم استبدال المنتجات بنجاح',
+        `oldFirebaseCount: ${Number(result.oldFirebaseCount) || 0}`,
+        `oldFullBackupCount: ${Number(result.oldFullBackupCount) || 0}`,
+        `importedCount: ${Number(result.importedCount) || 0}`,
+        `backupPath: ${result.backupPath || ''}`,
+        `productsReplacedAt: ${Number(result.productsReplacedAt) || 0}`,
+        `source: ${MASTER_PRODUCTS_EXPECTED_SOURCE}`
+    ].join('\n');
+    const target = document.getElementById('products-maintenance-report');
+    if (target) {
+        target.insertAdjacentHTML('afterbegin', `
+            <div style="margin-bottom:12px; padding:10px; background:#ecfdf5; border:1px solid #86efac; border-radius:8px;">
+                <div><strong>oldFirebaseCount:</strong> ${Number(result.oldFirebaseCount) || 0}</div>
+                <div><strong>oldFullBackupCount:</strong> ${Number(result.oldFullBackupCount) || 0}</div>
+                <div><strong>importedCount:</strong> ${Number(result.importedCount) || 0}</div>
+                <div><strong>backupPath:</strong> ${escapeHtml(result.backupPath)}</div>
+                <div><strong>productsReplacedAt:</strong> ${Number(result.productsReplacedAt) || 0}</div>
+            </div>`);
+    }
+}
+
+async function confirmReplaceProductsFromMasterExcel() {
+    const preview = masterProductsReplacePreviewState;
+    const input = document.getElementById('master-products-excel-file');
+    const file = input && input.files && input.files[0];
+    if (!preview || !preview.valid) return alert('يجب تنفيذ Preview ناجح قبل الاستبدال.');
+    if (!file || masterProductsFileSignature(file) !== preview.fileSignature) {
+        resetMasterProductsReplacePreview();
+        return alert('تغير ملف Excel بعد المعاينة. نفذ Preview من جديد.');
+    }
+    if (!navigator.onLine) return alert('يتطلب الاستبدال اتصالًا بالإنترنت و Firebase.');
+
+    const typed = prompt(`هذا الإجراء سيستبدل Firebase products و full_backup.products فقط.\nلن يتم حذف الفواتير أو العملاء أو الموردين أو المصاريف أو المبيعات.\n\nاكتب العبارة التالية حرفيًا للتأكيد:\n${MASTER_PRODUCTS_CONFIRM_PHRASE}`);
+    if (typed !== MASTER_PRODUCTS_CONFIRM_PHRASE) return alert('تم إلغاء الاستبدال.');
+    if (!confirm(`سيتم استبدال المنتجات بـ ${preview.importedProducts.length} منتج بعد إنشاء Backup كامل. هل تريد المتابعة؟`)) return;
+
+    showSpinner(true);
+    try {
+        const access = await ensureFirebaseAccess();
+        if (!access.ok) throw new Error(access.error);
+        const [productsSnap, fullBackupProductsSnap] = await Promise.all([
+            db.ref('products').once('value'),
+            db.ref('full_backup/products').once('value')
+        ]);
+        const oldFirebaseCount = countProductsValue(productsSnap.val());
+        const oldFullBackupCount = countProductsValue(fullBackupProductsSnap.val());
+        const backupPath = await createFirebaseMasterProductsBackup('before-replace-products-from-master');
+        const now = Date.now();
+        const importedProducts = preview.importedProducts.map(product => ({
+            ...product,
+            version: 1,
+            _updatedAt: now,
+            _deviceId: DEVICE_ID,
+            productsResetGeneration: now,
+            masterImportSource: MASTER_PRODUCTS_EXPECTED_SOURCE
+        }));
+        const importedObject = arrayToObjectById(importedProducts);
+        const updates = await productSyncChangesCleanupUpdates(now);
+
+        updates.products = importedObject;
+        updates['full_backup/products'] = importedObject;
+        updates['maintenance/productsReplacedAt'] = now;
+        updates['maintenance/productsResetGeneration'] = now;
+        updates['maintenance/productsMasterImportCount'] = MASTER_PRODUCTS_EXPECTED_COUNT;
+        updates['maintenance/productsMasterImportSource'] = MASTER_PRODUCTS_EXPECTED_SOURCE;
+        updates['maintenance/productsMasterImportFileName'] = preview.fileName;
+        updates['maintenance/productsMasterImportBackupPath'] = backupPath;
+        updates['maintenance/productsMasterImportDeviceId'] = DEVICE_ID;
+
+        await db.ref().update(updates);
+        writeProductsReplacementMarker({
+            productsReplacedAt: now,
+            productsResetGeneration: now,
+            productsMasterImportCount: MASTER_PRODUCTS_EXPECTED_COUNT,
+            productsMasterImportSource: MASTER_PRODUCTS_EXPECTED_SOURCE
+        });
+        state.products = importedProducts;
+        removeLocalProductSyncArtifacts();
+        await clearPendingProductImages();
+        await saveToLocal();
+        updateAllUI();
+        const result = {
+            fileName: preview.fileName,
+            oldFirebaseCount,
+            oldFullBackupCount,
+            importedCount: importedProducts.length,
+            backupPath,
+            productsReplacedAt: now,
+            sampleProducts: importedProducts.slice(0, 10)
+        };
+        renderMasterProductsReplaceSuccessReport(result);
+        alert(`تم الاستبدال بنجاح.\noldFirebaseCount: ${oldFirebaseCount}\noldFullBackupCount: ${oldFullBackupCount}\nimportedCount: ${importedProducts.length}\nbackupPath: ${backupPath}`);
+        return result;
+    } catch (error) {
+        console.error(error);
+        alert('فشل استبدال المنتجات: ' + explainFirebasePermissionError(error));
+    } finally {
+        showSpinner(false);
+    }
+}
+
 function productObjectFromList(products) {
     return arrayToObjectById(dedupeProductsSafe(products, { source: 'productObjectFromList', log: false }).products);
 }
 
 function removeLocalProductSyncArtifacts() {
-    if (window.SyncQueue && Array.isArray(SyncQueue.items)) {
+    if (typeof SyncQueue !== 'undefined' && Array.isArray(SyncQueue.items)) {
         SyncQueue.items = SyncQueue.items.filter(change => change && change.collection !== 'products');
         try { SyncQueue.save(); } catch (error) { console.warn('Failed to save pruned product queue:', error); }
     }
+    ['abonibalProductionSyncQueueV2', 'abonibalProductionSyncQueueLegacy'].forEach(key => {
+        try {
+            const filtered = safeJsonParse(localStorage.getItem(key), []).filter(change => change && change.collection !== 'products');
+            if (filtered.length) localStorage.setItem(key, JSON.stringify(filtered));
+            else localStorage.removeItem(key);
+        } catch (_) {}
+    });
     try { localStorage.removeItem('largeExcelImportPendingChangesV1'); } catch (_) {}
+    try {
+        if (typeof localforage !== 'undefined' && localforage.removeItem) {
+            localforage.getItem('abonibalProductionSyncQueueV2Overflow')
+                .then(items => {
+                    const filtered = forceArray(items).filter(change => change && change.collection !== 'products');
+                    return filtered.length
+                        ? localforage.setItem('abonibalProductionSyncQueueV2Overflow', filtered)
+                        : localforage.removeItem('abonibalProductionSyncQueueV2Overflow');
+                })
+                .catch(error => console.warn('Failed to clear product queue overflow:', error));
+        }
+    } catch (_) {}
 }
 
 async function clearPendingProductImages() {
@@ -4296,11 +4959,20 @@ async function clearCurrentDeviceData() {
         await createEmergencyBackupFile('before_clear_current_device');
         try { await localforage.clear(); } catch (error) { console.warn('localforage clear failed:', error); }
         const keyPattern = /(abonibal|abn|alfares|wakalat|sync|collection|firebase|localforage|products|erp)/i;
+        const exactKeys = new Set([
+            SYNC_QUEUE_KEY,
+            'abonibalProductionSyncQueueLegacy',
+            'largeExcelImportPendingChangesV1',
+            SYNC_PENDING_IMAGES_KEY,
+            PRODUCTS_REPLACEMENT_MARKER_KEY,
+            STORAGE_KEYS.SYNC_VERSION,
+            STORAGE_KEYS.LAST_SYNC_TIME
+        ]);
         try {
-            Object.keys(localStorage).forEach(key => { if (keyPattern.test(key)) localStorage.removeItem(key); });
+            Object.keys(localStorage).forEach(key => { if (exactKeys.has(key) || keyPattern.test(key)) localStorage.removeItem(key); });
         } catch (error) { console.warn('localStorage cleanup failed:', error); }
         try {
-            Object.keys(sessionStorage).forEach(key => { if (keyPattern.test(key)) sessionStorage.removeItem(key); });
+            sessionStorage.clear();
         } catch (error) { console.warn('sessionStorage cleanup failed:', error); }
         try {
             if (window.caches && caches.keys) {
@@ -4311,6 +4983,7 @@ async function clearCurrentDeviceData() {
         try {
             SyncQueue.items = [];
             SyncQueue.processed.clear();
+            SyncQueue.save();
         } catch (_) {}
         Object.assign(state, buildEmptyStateObject());
         alert('This device was cleared only. Firebase was not deleted. The page will reload.');
@@ -4506,7 +5179,7 @@ function applyCloudDeletionState(syncData) {
 const __patch002OriginalBuildUpdates = SyncManager.buildUpdates;
 SyncManager.buildUpdates = function(changes) {
     const updates = {};
-    changes.forEach(change => {
+    activeProductSyncChanges(changes).forEach(change => {
         updates[`sync/changes/${change.id}`] = change;
 
         if (change.operation === 'clearCollection') {
@@ -4603,6 +5276,7 @@ async function pullFromCloud() {
         const data = snapshot.val();
         if (!data) return alert('⚠️ السحابة فارغة.');
 
+        if (data.maintenance) writeProductsReplacementMarker(data.maintenance);
         replaceProductsFromSource(data.products !== undefined ? data.products : (data.full_backup && data.full_backup.products) || [], 'pullFromCloud');
         if (data.categories) state.categories = forceArray(data.categories);
         if (data.clients) state.clients = mergeById(state.clients, forceArray(data.clients));
