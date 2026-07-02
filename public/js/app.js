@@ -206,20 +206,21 @@ function getProductIdentityKeys(product) {
         const normalized = normalizeProductCode(product[field]);
         if (normalized) keys.push(`${field}:${normalized}`);
     });
-
-    const name = normalizeProductText(product.name);
-    const category = normalizeProductText(product.category);
-    if (name && category) {
-        keys.push(`name-category:${name}|${category}`);
-        const cost = roundMoney(product.cost);
-        const retail = roundMoney(product.retail);
-        if (cost || retail) keys.push(`name-category-price:${name}|${category}|${cost}|${retail}`);
-    } else if (name) {
-        keys.push(`name:${name}`);
-    }
-
     if (product.id) keys.push(`id:${String(product.id)}`);
     return Array.from(new Set(keys));
+}
+
+function getProductSuspectedKeys(product) {
+    if (!product || typeof product !== 'object') return [];
+    const name = normalizeProductText(product.name);
+    const category = normalizeProductText(product.category);
+    if (!name || !category) return [];
+    return [`exact-name-category-prices:${name}|${category}|${roundMoney(product.retail)}|${roundMoney(product.wholesale)}|${roundMoney(product.cost)}`];
+}
+
+function hasStrongProductIdentity(product) {
+    if (!product || typeof product !== 'object') return false;
+    return PRODUCT_IDENTITY_FIELDS.some(field => Boolean(normalizeProductCode(product[field])));
 }
 
 function createStableProductId(product, index = 0) {
@@ -331,6 +332,7 @@ function dedupeProductsSafe(products, options = {}) {
             target.keys.add(key);
             identityMap.set(key, targetId);
         });
+        sourceGroup.matchTypes.forEach(type => target.matchTypes.add(type));
         const best = chooseBestProductVersion(target.best, sourceGroup.best);
         const duplicate = best === target.best ? sourceGroup.best : target.best;
         target.best = mergeProductRecords(best, duplicate);
@@ -347,7 +349,7 @@ function dedupeProductsSafe(products, options = {}) {
         let groupId = matched[0];
         if (!groupId) {
             groupId = `g${++groupSeq}`;
-            groups.set(groupId, { keys: new Set(), items: [], best: null });
+            groups.set(groupId, { keys: new Set(), items: [], best: null, matchTypes: new Set() });
         } else if (matched.length > 1) {
             matched.slice(1).forEach(id => { groupId = mergeGroups(groupId, id); });
         }
@@ -356,6 +358,7 @@ function dedupeProductsSafe(products, options = {}) {
         keys.forEach(key => {
             group.keys.add(key);
             identityMap.set(key, groupId);
+            group.matchTypes.add(key.split(':')[0] || 'id');
         });
         group.items.push(product);
         const best = chooseBestProductVersion(group.best, product);
@@ -363,14 +366,15 @@ function dedupeProductsSafe(products, options = {}) {
         group.best = duplicate ? mergeProductRecords(best, duplicate) : best;
     });
 
-    const duplicateGroups = [];
+    const confirmedGroups = [];
     const productsOut = [];
     groups.forEach(group => {
         const best = finalizeProductRecord(group.best);
         productsOut.push(best);
         if (group.items.length > 1) {
-            duplicateGroups.push({
+            confirmedGroups.push({
                 key: Array.from(group.keys)[0] || best.id,
+                matchTypes: Array.from(group.matchTypes),
                 kept: { id: best.id, name: best.name || '' },
                 removed: group.items
                     .filter(item => String(item.id) !== String(best.id) || item !== group.best)
@@ -381,15 +385,56 @@ function dedupeProductsSafe(products, options = {}) {
         }
     });
 
+    const suspectedMap = new Map();
+    productsOut.forEach(product => {
+        if (hasStrongProductIdentity(product)) return;
+        getProductSuspectedKeys(product).forEach(key => {
+            if (!suspectedMap.has(key)) suspectedMap.set(key, []);
+            suspectedMap.get(key).push(product);
+        });
+    });
+
+    const suspectedGroups = Array.from(suspectedMap.entries())
+        .filter(([, items]) => items.length > 1)
+        .map(([key, items]) => ({
+            key,
+            matchTypes: ['exact-name-category-prices'],
+            count: items.length,
+            potentialDuplicates: items.length - 1,
+            items: items.slice(0, 6).map(item => ({
+                id: item.id,
+                name: item.name || '',
+                category: item.category || '',
+                cost: item.cost,
+                wholesale: item.wholesale,
+                retail: item.retail
+            }))
+        }));
+
+    const confirmedRemoved = Math.max(0, input.length - productsOut.length);
+    const suspectedPotential = suspectedGroups.reduce((sum, group) => sum + group.potentialDuplicates, 0);
     productsOut.sort((a, b) => (Number(b._updatedAt) || 0) - (Number(a._updatedAt) || 0) || String(a.name || '').localeCompare(String(b.name || ''), 'ar'));
     const report = {
         source,
         products: productsOut,
         totalBefore: input.length,
         totalAfter: productsOut.length,
-        duplicateGroups: duplicateGroups.length,
-        removedDuplicates: Math.max(0, input.length - productsOut.length),
-        examples: duplicateGroups.slice(0, 5)
+        duplicateGroups: confirmedGroups.length + suspectedGroups.length,
+        removedDuplicates: confirmedRemoved,
+        confirmedDuplicates: {
+            groups: confirmedGroups.length,
+            removedDuplicates: confirmedRemoved,
+            examples: confirmedGroups.slice(0, 20)
+        },
+        suspectedDuplicates: {
+            groups: suspectedGroups.length,
+            potentialDuplicates: suspectedPotential,
+            examples: suspectedGroups.slice(0, 20)
+        },
+        examples: {
+            confirmed: confirmedGroups.slice(0, 20),
+            suspected: suspectedGroups.slice(0, 20)
+        }
     };
     if (report.removedDuplicates && options.log !== false) console.warn('Product dedupe report:', report);
     return report;
@@ -3787,14 +3832,162 @@ function deleteAllProducts() {
     return deleteAllProductsMaintenance();
 }
 
+function summarizeDedupeReport(label, report) {
+    if (!report || report.skipped || report.error) {
+        return {
+            label,
+            skipped: true,
+            error: report && report.error ? report.error : 'not available',
+            totalBefore: 0,
+            totalAfter: 0,
+            duplicateGroups: 0,
+            removedDuplicates: 0,
+            confirmedGroups: 0,
+            confirmedRemoved: 0,
+            suspectedGroups: 0,
+            suspectedPotential: 0,
+            confirmedExamples: [],
+            suspectedExamples: []
+        };
+    }
+    const confirmed = report.confirmedDuplicates || {};
+    const suspected = report.suspectedDuplicates || {};
+    return {
+        label,
+        skipped: false,
+        totalBefore: Number(report.totalBefore) || 0,
+        totalAfter: Number(report.totalAfter) || 0,
+        duplicateGroups: Number(report.duplicateGroups) || 0,
+        removedDuplicates: Number(report.removedDuplicates) || 0,
+        confirmedGroups: Number(confirmed.groups) || 0,
+        confirmedRemoved: Number(confirmed.removedDuplicates) || 0,
+        suspectedGroups: Number(suspected.groups) || 0,
+        suspectedPotential: Number(suspected.potentialDuplicates) || 0,
+        confirmedExamples: forceArray(confirmed.examples).slice(0, 20),
+        suspectedExamples: forceArray(suspected.examples).slice(0, 20)
+    };
+}
+
+function buildProductsMaintenanceSummaries(payload) {
+    return [
+        ['current/state products', payload && payload.currentStateProducts],
+        ['firebase products', payload && payload.firebaseProducts],
+        ['full_backup products', payload && payload.fullBackupProducts],
+        ['local products', payload && payload.localProducts]
+    ].map(([label, report]) => summarizeDedupeReport(label, report));
+}
+
+function buildProductsMaintenanceReportText(title, summaries) {
+    const lines = [title, ''];
+    summaries.forEach(summary => {
+        lines.push(summary.label);
+        if (summary.skipped) {
+            lines.push(`  skipped: ${summary.error}`);
+        } else {
+            lines.push(`  totalBefore: ${summary.totalBefore}`);
+            lines.push(`  totalAfter: ${summary.totalAfter}`);
+            lines.push(`  duplicateGroups: ${summary.duplicateGroups}`);
+            lines.push(`  removedDuplicates: ${summary.removedDuplicates}`);
+            lines.push(`  confirmedDuplicates: groups=${summary.confirmedGroups}, removed=${summary.confirmedRemoved}`);
+            lines.push(`  suspectedDuplicates: groups=${summary.suspectedGroups}, potential=${summary.suspectedPotential}`);
+        }
+        lines.push('');
+    });
+    summaries.forEach(summary => {
+        if (summary.confirmedExamples.length || summary.suspectedExamples.length) {
+            lines.push(`${summary.label} examples`);
+            summary.confirmedExamples.forEach((group, index) => {
+                lines.push(`  confirmed ${index + 1}: ${group.key} kept=${group.kept && group.kept.name || ''} count=${group.count}`);
+            });
+            summary.suspectedExamples.forEach((group, index) => {
+                const first = group.items && group.items[0] ? group.items[0] : {};
+                lines.push(`  suspected ${index + 1}: ${group.key} first=${first.name || ''} count=${group.count}`);
+            });
+            lines.push('');
+        }
+    });
+    return lines.join('\n');
+}
+
+function renderDuplicateExamples(summary) {
+    const rows = [];
+    summary.confirmedExamples.forEach((group, index) => {
+        rows.push(`<tr><td>${escapeHtml(summary.label)}</td><td>confirmed</td><td>${index + 1}</td><td>${escapeHtml(group.key || '')}</td><td>${escapeHtml(group.kept && group.kept.name || '')}</td><td>${Number(group.count) || 0}</td></tr>`);
+    });
+    summary.suspectedExamples.forEach((group, index) => {
+        const first = group.items && group.items[0] ? group.items[0] : {};
+        rows.push(`<tr><td>${escapeHtml(summary.label)}</td><td>suspected</td><td>${index + 1}</td><td>${escapeHtml(group.key || '')}</td><td>${escapeHtml(first.name || '')}</td><td>${Number(group.count) || 0}</td></tr>`);
+    });
+    return rows;
+}
+
 function renderProductsMaintenanceReport(title, payload) {
     const target = document.getElementById('products-maintenance-report');
-    const text = `${title}\n${JSON.stringify(payload, null, 2)}`;
+    const summaries = buildProductsMaintenanceSummaries(payload || {});
+    const text = buildProductsMaintenanceReportText(title, summaries);
+    window.__ABN_PRODUCTS_MAINTENANCE_REPORT_TEXT__ = text;
     if (target) {
-        target.textContent = text;
+        const rows = summaries.map(summary => {
+            if (summary.skipped) {
+                return `<tr><td>${escapeHtml(summary.label)}</td><td colspan="8">${escapeHtml(summary.error)}</td></tr>`;
+            }
+            return `<tr>
+                <td>${escapeHtml(summary.label)}</td>
+                <td>${summary.totalBefore}</td>
+                <td>${summary.totalAfter}</td>
+                <td>${summary.duplicateGroups}</td>
+                <td>${summary.removedDuplicates}</td>
+                <td>${summary.confirmedGroups}</td>
+                <td>${summary.confirmedRemoved}</td>
+                <td>${summary.suspectedGroups}</td>
+                <td>${summary.suspectedPotential}</td>
+            </tr>`;
+        }).join('');
+        const exampleRows = summaries.flatMap(renderDuplicateExamples).slice(0, 20).join('');
+        target.innerHTML = `
+            <div style="display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:10px;">
+                <strong>${escapeHtml(title)}</strong>
+                <button type="button" onclick="copyProductsMaintenanceReport()" style="width:auto; padding:8px 12px; background:#475569;">نسخ التقرير</button>
+            </div>
+            <div style="overflow:auto;">
+                <table style="width:100%; border-collapse:collapse; text-align:center;" border="1">
+                    <thead><tr><th>source</th><th>totalBefore</th><th>totalAfter</th><th>duplicateGroups</th><th>removedDuplicates</th><th>confirmed groups</th><th>confirmed removed</th><th>suspected groups</th><th>suspected potential</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+            <div style="margin-top:12px; font-weight:700;">أول 20 مجموعة تكرار للمعاينة</div>
+            <div style="overflow:auto;">
+                <table style="width:100%; border-collapse:collapse; text-align:center;" border="1">
+                    <thead><tr><th>source</th><th>type</th><th>#</th><th>key</th><th>sample product</th><th>group count</th></tr></thead>
+                    <tbody>${exampleRows || '<tr><td colspan="6">لا توجد أمثلة تكرار.</td></tr>'}</tbody>
+                </table>
+            </div>`;
         target.style.display = 'block';
     } else {
         console.log(text);
+    }
+}
+
+async function copyProductsMaintenanceReport() {
+    const text = window.__ABN_PRODUCTS_MAINTENANCE_REPORT_TEXT__ || '';
+    if (!text) return alert('No report to copy.');
+    try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text);
+        } else {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            textarea.remove();
+        }
+        alert('Report copied.');
+    } catch (error) {
+        console.error(error);
+        alert('Copy failed. You can select the report text manually.');
     }
 }
 
@@ -3862,8 +4055,14 @@ async function createFirebaseProductsBackup(reason) {
 
 async function previewDuplicateProductsMaintenance() {
     const reports = {
-        local: dedupeProductsSafe(state.products, { source: 'maintenance-preview-local', log: false })
+        currentStateProducts: dedupeProductsSafe(state.products, { source: 'maintenance-preview-current-state', log: false })
     };
+    try {
+        const localProducts = await localforage.getItem(STORAGE_KEYS.PRODUCTS);
+        reports.localProducts = dedupeProductsSafe(localProducts || [], { source: 'maintenance-preview-localforage', log: false });
+    } catch (error) {
+        reports.localProducts = { skipped: true, error: error && error.message ? error.message : String(error) };
+    }
     try {
         if (navigator.onLine) {
             const access = await ensureFirebaseAccess();
@@ -3875,28 +4074,28 @@ async function previewDuplicateProductsMaintenance() {
                 reports.firebaseProducts = dedupeProductsSafe(productsSnap.val() || [], { source: 'maintenance-preview-firebase', log: false });
                 reports.fullBackupProducts = dedupeProductsSafe(fullBackupProductsSnap.val() || [], { source: 'maintenance-preview-full-backup', log: false });
             } else {
-                reports.firebase = { skipped: true, error: access.error };
+                reports.firebaseProducts = { skipped: true, error: access.error };
+                reports.fullBackupProducts = { skipped: true, error: access.error };
             }
         } else {
-            reports.firebase = { skipped: true, error: 'offline' };
+            reports.firebaseProducts = { skipped: true, error: 'offline' };
+            reports.fullBackupProducts = { skipped: true, error: 'offline' };
         }
     } catch (error) {
-        reports.firebase = { skipped: true, error: error && error.message ? error.message : String(error) };
+        reports.firebaseProducts = { skipped: true, error: error && error.message ? error.message : String(error) };
+        reports.fullBackupProducts = { skipped: true, error: error && error.message ? error.message : String(error) };
     }
     renderProductsMaintenanceReport('Product duplicate preview', reports);
     return reports;
 }
 
 async function confirmDedupeProductsMaintenance() {
-    const typed = prompt('Type DEDUPE PRODUCTS to clean duplicated products after creating a Firebase backup.');
-    if (typed !== 'DEDUPE PRODUCTS') return alert('Cancelled.');
     if (!navigator.onLine) return alert('Internet connection is required for Firebase product cleanup.');
 
     showSpinner(true);
     try {
         const access = await ensureFirebaseAccess();
         if (!access.ok) throw new Error(access.error);
-        const backupPath = await createFirebaseProductsBackup('before-products-dedupe');
         const [productsSnap, fullBackupProductsSnap] = await Promise.all([
             db.ref('products').once('value'),
             db.ref('full_backup/products').once('value')
@@ -3904,6 +4103,31 @@ async function confirmDedupeProductsMaintenance() {
         const productReport = dedupeProductsSafe(productsSnap.val() || [], { source: 'maintenance-confirm-products' });
         const fullBackupExists = fullBackupProductsSnap.exists();
         const fullBackupReport = dedupeProductsSafe(fullBackupProductsSnap.val() || [], { source: 'maintenance-confirm-full-backup' });
+        const confirmedToRemove =
+            Number(productReport.confirmedDuplicates && productReport.confirmedDuplicates.removedDuplicates || 0) +
+            (fullBackupExists ? Number(fullBackupReport.confirmedDuplicates && fullBackupReport.confirmedDuplicates.removedDuplicates || 0) : 0);
+        const suspectedToKeep =
+            Number(productReport.suspectedDuplicates && productReport.suspectedDuplicates.potentialDuplicates || 0) +
+            (fullBackupExists ? Number(fullBackupReport.suspectedDuplicates && fullBackupReport.suspectedDuplicates.potentialDuplicates || 0) : 0);
+
+        renderProductsMaintenanceReport('Product duplicate cleanup confirmation', {
+            firebaseProducts: productReport,
+            fullBackupProducts: fullBackupReport,
+            currentStateProducts: dedupeProductsSafe(state.products, { source: 'maintenance-confirm-current-state', log: false }),
+            localProducts: dedupeProductsSafe(await localforage.getItem(STORAGE_KEYS.PRODUCTS) || [], { source: 'maintenance-confirm-localforage', log: false })
+        });
+
+        if (confirmedToRemove <= 0) {
+            alert(`No confirmed duplicates to clean. Suspected duplicates left for manual review: ${suspectedToKeep}.`);
+            return;
+        }
+
+        const ok = confirm(`Confirmed duplicates to remove: ${confirmedToRemove}\nSuspected duplicates kept untouched: ${suspectedToKeep}\n\nA Firebase backup will be created before any write. Continue?`);
+        if (!ok) return alert('Cancelled.');
+        const typed = prompt('Final confirmation: type CLEAN CONFIRMED PRODUCTS to clean confirmed duplicates only.');
+        if (typed !== 'CLEAN CONFIRMED PRODUCTS') return alert('Cancelled.');
+
+        const backupPath = await createFirebaseProductsBackup('before-products-dedupe');
         const now = Date.now();
         const updates = await productSyncChangesCleanupUpdates(now);
         updates.products = productObjectFromList(productReport.products);
@@ -3919,8 +4143,14 @@ async function confirmDedupeProductsMaintenance() {
         await saveToLocal();
         updateAllUI();
         addAdminLog('Product dedupe', `Cleaned products after backup ${backupPath}`);
-        renderProductsMaintenanceReport('Product duplicate cleanup complete', { backupPath, productReport, fullBackupReport });
-        alert('Product duplicate cleanup completed. A Firebase backup was created first.');
+        renderProductsMaintenanceReport('Product duplicate cleanup complete', {
+            firebaseProducts: productReport,
+            fullBackupProducts: fullBackupReport,
+            currentStateProducts: dedupeProductsSafe(state.products, { source: 'maintenance-cleanup-current-state', log: false }),
+            localProducts: dedupeProductsSafe(await localforage.getItem(STORAGE_KEYS.PRODUCTS) || [], { source: 'maintenance-cleanup-localforage', log: false }),
+            backupPath
+        });
+        alert(`Confirmed duplicate cleanup completed after backup.\nRemoved confirmed duplicates: ${confirmedToRemove}\nSuspected duplicates left untouched: ${suspectedToKeep}`);
     } catch (error) {
         console.error(error);
         alert('Product duplicate cleanup failed: ' + explainFirebasePermissionError(error));
